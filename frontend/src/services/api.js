@@ -1,8 +1,12 @@
-import axios from "axios";
+const API_BASE = 'http://localhost:8000/api';
 
-const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api", // Django backend
-});
-
-export const getBatches = () => API.get("/batches/");
-export const createBatch = (data) => API.post("/batches/", data);
+export const getBatches = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/batches/`);
+    const data = await response.json();
+    return { data }; // Match what your Dashboard expects
+  } catch (error) {
+    console.error('API Error:', error);
+    return { data: [] };
+  }
+};

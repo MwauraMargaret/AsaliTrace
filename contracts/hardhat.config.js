@@ -1,7 +1,17 @@
-import "@nomicfoundation/hardhat-toolbox";
+require("@nomicfoundation/hardhat-toolbox");
+const path = require("path");
 
-export default {
-  solidity: "0.8.19",
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      }
+    }
+  },
   networks: {
     hardhat: {},
     localhost: {
@@ -11,5 +21,8 @@ export default {
   gasReporter: {
     enabled: true,
     currency: "USD"
-  }
+  },
+  paths: {
+    artifacts: path.join(__dirname, "../frontend/src/artifacts"),
+  },
 };

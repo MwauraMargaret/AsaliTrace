@@ -1,14 +1,25 @@
-import { ethers } from "hardhat";
+import "@nomicfoundation/hardhat-toolbox";
+import path from "path";
+import { fileURLToPath } from "url";
 
-async function main() {
-  const AsaliTrace = await ethers.getContractFactory("AsaliTrace");
-  const contract = await AsaliTrace.deploy();
-  await contract.waitForDeployment();
+// Fix for __dirname in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  console.log(`AsaliTrace deployed to: ${await contract.getAddress()}`);
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+export default {
+  solidity: "0.8.19",
+  networks: {
+    hardhat: {},
+    localhost: {
+      url: "http://127.0.0.1:8545",
+    },
+  },
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
+  },
+  paths: {
+    // Send compiled ABIs to React app
+    artifacts: path.join(__dirname, "../frontend/src/contracts"),
+  },
+};

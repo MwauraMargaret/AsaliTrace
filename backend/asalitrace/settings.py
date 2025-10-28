@@ -37,9 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
 
     # Third-party apps
     'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
     'rest_framework.authtoken',
     'dj_rest_auth',
     'dj_rest_auth.registration',
@@ -49,6 +52,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.apple',
+    'allauth_2fa',
     'django_otp',
     'django_otp.plugins.otp_totp',
     'django_otp.plugins.otp_email',
@@ -56,6 +60,7 @@ INSTALLED_APPS = [
     # Local apps
     'accounts',
     'batches',
+    'asalitrace',
 ]
 
 SITE_ID = 1
@@ -89,8 +94,13 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 
+# JWT Settings
+from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -98,12 +108,25 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
 # Allauth config
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
 )
 
+# Allauth configuration
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_ADAPTER = 'allauth_2fa.adapter.OTPAdapter'
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
 
@@ -114,6 +137,8 @@ REST_USE_JWT = True
 # Social provider client IDs/secrets set via environment variables
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
         "APP": {
             "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
             "secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
@@ -121,10 +146,21 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     },
     "github": {
+        'SCOPE': ['user:email'],
         "APP": {
             "client_id": os.environ.get("GITHUB_CLIENT_ID"),
             "secret": os.environ.get("GITHUB_CLIENT_SECRET"),
             "key": ""
+        }
+    },
+     'apple': {
+        'APP': {
+            'client_id': 'your-apple-client-id',
+            'secret': 'your-apple-client-secret',
+            'key': '',
+            'certificate_key': '''-----BEGIN PRIVATE KEY-----
+                    your-private-key-here
+                    -----END PRIVATE KEY-----'''
         }
     }
 }
