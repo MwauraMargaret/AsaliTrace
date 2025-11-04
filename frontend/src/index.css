@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Warm honey-inspired background */
+    --background: 42 40% 97%;
+    --foreground: 30 25% 15%;
+
+    /* Card with cream tones */
+    --card: 45 35% 98%;
+    --card-foreground: 30 25% 15%;
+
+    --popover: 45 35% 98%;
+    --popover-foreground: 30 25% 15%;
+
+    /* Primary: Warm amber honey */
+    --primary: 32 95% 44%;
+    --primary-foreground: 45 100% 97%;
+
+    /* Secondary: Golden honey */
+    --secondary: 45 93% 47%;
+    --secondary-foreground: 30 25% 15%;
+
+    /* Muted: Soft cream */
+    --muted: 45 40% 92%;
+    --muted-foreground: 30 15% 45%;
+
+    /* Accent: Soft green for eco-friendly touches */
+    --accent: 142 35% 55%;
+    --accent-foreground: 45 100% 97%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 45 100% 97%;
+
+    /* Borders and inputs with warm tones */
+    --border: 42 30% 85%;
+    --input: 42 30% 88%;
+    --ring: 32 95% 44%;
+
+    /* More rounded for organic feel */
+    --radius: 1rem;
+    
+    /* Custom honey gradients */
+    --gradient-honey: linear-gradient(135deg, hsl(45 93% 47%), hsl(32 95% 44%));
+    --gradient-warm: linear-gradient(180deg, hsl(42 40% 97%), hsl(45 35% 94%));
+    
+    /* Shadows with warm glow */
+    --shadow-honey: 0 10px 40px -10px hsl(32 95% 44% / 0.25);
+    --shadow-soft: 0 4px 20px -5px hsl(32 60% 50% / 0.15);
+    
+    /* Smooth transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark mode with warm, earthy tones */
+    --background: 30 25% 8%;
+    --foreground: 45 35% 95%;
+
+    --card: 30 20% 12%;
+    --card-foreground: 45 35% 95%;
+
+    --popover: 30 20% 12%;
+    --popover-foreground: 45 35% 95%;
+
+    --primary: 45 93% 47%;
+    --primary-foreground: 30 25% 8%;
+
+    --secondary: 32 80% 35%;
+    --secondary-foreground: 45 35% 95%;
+
+    --muted: 30 15% 20%;
+    --muted-foreground: 45 20% 65%;
+
+    --accent: 142 35% 45%;
+    --accent-foreground: 45 35% 95%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 45 35% 95%;
+
+    --border: 30 15% 22%;
+    --input: 30 15% 22%;
+    --ring: 45 93% 47%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

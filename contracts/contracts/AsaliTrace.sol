@@ -31,17 +31,14 @@ contract AsaliTrace {
     event LabTestAdded(string testId, string batchId, string result);
     event CertificateIssued(string certId, string batchId, string issuer);
 
-    // ---- Batches ----
     function createBatch(string memory _batchId, string memory _description) public {
         require(batches[_batchId].timestamp == 0, "Batch already exists");
-
         batches[_batchId] = Batch({
             batchId: _batchId,
             description: _description,
             timestamp: block.timestamp,
             createdBy: msg.sender
         });
-
         emit BatchCreated(_batchId, _description, msg.sender);
     }
 
@@ -50,18 +47,15 @@ contract AsaliTrace {
         return batches[_batchId];
     }
 
-    // ---- Lab Tests ----
     function addLabTest(string memory _testId, string memory _batchId, string memory _result) public {
         require(batches[_batchId].timestamp != 0, "Batch does not exist");
         require(labTests[_testId].timestamp == 0, "Test already exists");
-
         labTests[_testId] = LabTest({
             testId: _testId,
             batchId: _batchId,
             result: _result,
             timestamp: block.timestamp
         });
-
         emit LabTestAdded(_testId, _batchId, _result);
     }
 
@@ -70,18 +64,15 @@ contract AsaliTrace {
         return labTests[_testId];
     }
 
-    // ---- Certificates ----
     function issueCertificate(string memory _certId, string memory _batchId, string memory _issuer) public {
         require(batches[_batchId].timestamp != 0, "Batch does not exist");
         require(certificates[_certId].timestamp == 0, "Certificate already exists");
-
         certificates[_certId] = Certificate({
             certId: _certId,
             batchId: _batchId,
             issuer: _issuer,
             timestamp: block.timestamp
         });
-
         emit CertificateIssued(_certId, _batchId, _issuer);
     }
 
