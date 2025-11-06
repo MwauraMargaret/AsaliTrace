@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Web3Provider } from "@/contexts/Web3Context";
 import Index from "./pages/Index";
-import HoneyBatch from "./pages/HoneyBatch";
+//import HoneyBatch from "./pages/HoneyBatch";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -23,7 +23,7 @@ const App = () => (
           <Web3Provider>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/batch/:id" element={<HoneyBatch />} />
+              {/* <Route path="/batch/:id" element={<HoneyBatch />} /> */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/account" element={<Account />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
