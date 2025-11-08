@@ -1,73 +1,113 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+// src/contexts/AuthContext.tsx
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "@/services/api";
+
+interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
-  signOut: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Redirect to home after successful login
-      if (event === 'SIGNED_IN' && session) {
-        setTimeout(() => {
-          navigate('/');
-        }, 0);
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      try {
+        const response = await api.get('/auth/user/');
+        setUser(response.data);
+      } catch (error) {
+        localStorage.removeItem('access_token');
       }
-    });
+    }
+    setLoading(false);
+  };
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/login/', {
+        email,
+        password,
+      });
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+      const { access, refresh, user: userData } = response.data;
+      
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+      setUser(userData);
+      
+      navigate('/dashboard');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Login failed');
+    }
+  };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const register = async (email: string, password: string, firstName: string, lastName: string) => {
+    try {
+      const response = await api.post('/auth/register/', {
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+      });
+
+      const { access, refresh, user: userData } = response.data;
+      
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+      setUser(userData);
+      
+      navigate('/dashboard');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Registration failed');
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
     navigate('/auth');
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const value = {
+    user,
+    login,
+    register,
+    logout,
+    loading,
+  };
 
-  return (
-    <AuthContext.Provider value={{ user, session, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

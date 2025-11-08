@@ -1,51 +1,34 @@
-#rom web3 import Web3
-#mport os
-#rom dotenv import load_dotenv
+from web3 import Web3
+import json, os
+from django.conf import settings
 
-#oad_dotenv()
+# --- Load environment variables ---
+RPC_URL = os.getenv("BLOCKCHAIN_RPC_URL", "http://127.0.0.1:8545")
+CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+PUBLIC_ADDRESS = os.getenv("PUBLIC_ADDRESS")
 
-class EthereumAdapter:
-    def __init__(self):
-        self.w3 = None
-        self.contract = None
-        self.account = None
-        self.connect_to_ethereum()
-    
-   #def connect_to_ethereum(self):
-    #   """Connect to Ethereum network"""
-     #  try:
-      #     # For development - connect to Hardhat network
-       #   #self.w3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
-        #   
-         #  if self.w3.is_connected():
-          #     print("Connected to Ethereum network")
-           #    print(f"Latest block: {self.w3.eth.block_number}")
-           #else:
-            #   print("Failed to connect to Ethereum network")
-                
-      # except Exception as e:
-       #    print(f"Connection error: {e}")
-    
-    def load_contract(self, contract_address, abi):
-        """Load smart contract"""
-        try:
-            self.contract = self.w3.eth.contract(
-                address=contract_address,
-                abi=abi
-            )
-            print("Smart contract loaded successfully")
-            return True
-        except Exception as e:
-            print(f"Contract loading error: {e}")
-            return False
-    
-    def create_batch(self, batch_data):
-        """Create a new batch on blockchain"""
-        # TODO: Implement batch creation
-        print(f"Creating batch: {batch_data}")
-        return {"status": "success", "transaction_hash": "0x123..."}
-    
-    def get_batch_info(self, batch_id):
-        """Get batch information from blockchain"""
-        # TODO: Implement batch retrieval
-        return {"id": batch_id, "status": "verified"}
+# --- Connect to blockchain node ---
+web3 = Web3(Web3.HTTPProvider(RPC_URL))
+if not web3.is_connected():
+    raise Exception(" Web3 provider not connected")
+
+# --- Load contract ABI ---
+ABI_PATH = os.path.join(settings.BASE_DIR, "../frontend/src/artifacts/contracts/AsaliTrace.sol/AsaliTrace.json")
+with open(ABI_PATH) as f:
+    contract_json = json.load(f)
+contract = web3.eth.contract(address=CONTRACT_ADDRESS, abi=contract_json["abi"])
+
+
+def add_batch_to_chain(batch_id, description):
+    """Send transaction to record a batch on the blockchain."""
+    nonce = web3.eth.get_transaction_count(PUBLIC_ADDRESS)
+    tx = contract.functions.createBatch(batch_id, description).build_transaction({
+        "from": PUBLIC_ADDRESS,
+        "nonce": nonce,
+        "gas": 3000000,
+        "gasPrice": web3.to_wei("5", "gwei")
+    })
+    signed_tx = web3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    return web3.to_hex(tx_hash)

@@ -16,11 +16,11 @@ const Index = () => {
       title: "Blockchain Verified",
       description: "Every batch recorded on immutable blockchain ledgers for complete transparency"
     },
-    {
-      icon: <Sparkles className="w-8 h-8 text-secondary" />,
-      title: "AI Quality Analysis",
-      description: "Advanced AI models analyze purity, grade, and authenticity of every sample"
-    },
+   // {
+     // icon: <Sparkles className="w-8 h-8 text-secondary" />,
+     // title: "AI Quality Analysis",
+     // description: "Advanced AI models analyze purity, grade, and authenticity of every sample"
+    //},
     {
       icon: <Map className="w-8 h-8 text-accent" />,
       title: "Full Journey Tracking",
@@ -29,7 +29,7 @@ const Index = () => {
     {
       icon: <TrendingUp className="w-8 h-8 text-primary" />,
       title: "Trust Score",
-      description: "AI-powered confidence ratings with friendly explanations you can understand"
+     // description: "AI-powered confidence ratings with friendly explanations you can understand"
     }
   ];
 
@@ -42,7 +42,7 @@ const Index = () => {
             <div className="flex items-center gap-2">
               <span className="text-3xl">🍯</span>
               <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
-                HoneyTrace
+                AsaliTrace
               </span>
             </div>
             <div className="hidden md:flex items-center gap-6">
@@ -141,11 +141,10 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🍯</span>
-              <span className="text-xl font-bold">HoneyTrace</span>
+              <span className="text-xl font-bold">AsaliTrace</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2025 HoneyTrace. Powered by Blockchain + AI.
+              © 2025 AsaliTrace. Powered by Blockchain.
             </p>
           </div>
         </div>
