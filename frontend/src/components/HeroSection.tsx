@@ -1,8 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Sparkles } from "lucide-react";
 import heroImage from "@/assets/hero-honey.jpg";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    element?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background with honey gradient */}
@@ -27,7 +35,7 @@ const HeroSection = () => {
           <div className="text-left space-y-8">
             <div className="inline-flex items-center gap-2 bg-secondary/20 px-4 py-2 rounded-full border border-secondary/30">
               <Sparkles className="w-4 h-4 text-secondary" />
-              <span className="text-sm font-medium text-secondary">Powered by Blockchain + AI</span>
+              <span className="text-sm font-medium text-secondary">Powered by Blockchain</span>
             </div>
             
             <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
@@ -38,16 +46,25 @@ const HeroSection = () => {
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-xl">
-              HoneyTrace uses blockchain technology and AI to reveal the authentic journey 
+              AsaliTrace uses blockchain technology to reveal the authentic journey 
               of your honey—from the hive to your home. Trust the trace. Taste the truth.
             </p>
 
             <div className="flex flex-wrap gap-4">
-              <Button size="lg" variant="honey" className="group">
+              <Button 
+                size="lg" 
+                variant="honey" 
+                className="group"
+                onClick={() => navigate('/batch/sample')}
+              >
                 Trace Your Honey
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline">
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => scrollToSection('features')}
+              >
                 <Shield className="w-4 h-4" />
                 How It Works
               </Button>
@@ -55,17 +72,17 @@ const HeroSection = () => {
 
             <div className="flex items-center gap-8 pt-4">
               <div>
-                <div className="text-3xl font-bold text-primary">98%</div>
+                <div className="text-3xl font-bold text-primary">XX%</div>
                 <div className="text-sm text-muted-foreground">Verified Authentic</div>
               </div>
               <div className="h-12 w-px bg-border" />
               <div>
-                <div className="text-3xl font-bold text-primary">2,500+</div>
+                <div className="text-3xl font-bold text-primary">XXX</div>
                 <div className="text-sm text-muted-foreground">Traced Batches</div>
               </div>
               <div className="h-12 w-px bg-border" />
               <div>
-                <div className="text-3xl font-bold text-primary">150+</div>
+                <div className="text-3xl font-bold text-primary">XXX+</div>
                 <div className="text-sm text-muted-foreground">Partner Beekeepers</div>
               </div>
             </div>
