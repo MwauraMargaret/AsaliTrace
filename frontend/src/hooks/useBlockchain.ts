@@ -10,19 +10,21 @@ import {
 import { useState } from 'react';
 
 export const useBlockchain = () => {
-  const { signer, provider, isConnected } = useWeb3();
+  const { signer, provider, isConnected, hardhatConnected } = useWeb3();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const verifyBatch = async (batchId: string) => {
-    if (!isConnected || (!signer && !provider)) {
-      throw new Error('Wallet not connected');
+    // Check if we have a provider (Hardhat or MetaMask)
+    if (!provider && !hardhatConnected) {
+      throw new Error('Not connected to blockchain. Please connect to Hardhat or MetaMask.');
     }
 
     setLoading(true);
     setError(null);
     
     try {
+      // Use provider for read operations (works with both Hardhat and MetaMask)
       const signerOrProvider = signer || provider;
       if (!signerOrProvider) {
         throw new Error('No signer or provider available');
@@ -40,8 +42,8 @@ export const useBlockchain = () => {
   };
 
   const createBatch = async (batchId: string, description: string) => {
-    if (!isConnected || !signer) {
-      throw new Error('Wallet not connected. Please connect your wallet to create batches on blockchain.');
+    if (!signer) {
+      throw new Error('No signer available. Please connect to Hardhat or MetaMask to create batches on blockchain.');
     }
 
     setLoading(true);
@@ -60,8 +62,8 @@ export const useBlockchain = () => {
   };
 
   const verifyLabTest = async (testId: string) => {
-    if (!isConnected || (!signer && !provider)) {
-      throw new Error('Wallet not connected');
+    if (!provider && !hardhatConnected) {
+      throw new Error('Not connected to blockchain');
     }
 
     setLoading(true);
@@ -85,8 +87,8 @@ export const useBlockchain = () => {
   };
 
   const verifyCertificate = async (certId: string) => {
-    if (!isConnected || (!signer && !provider)) {
-      throw new Error('Wallet not connected');
+    if (!provider && !hardhatConnected) {
+      throw new Error('Not connected to blockchain');
     }
 
     setLoading(true);
@@ -110,8 +112,8 @@ export const useBlockchain = () => {
   };
 
   const addLabTest = async (testId: string, batchId: string, result: string) => {
-    if (!isConnected || !signer) {
-      throw new Error('Wallet not connected');
+    if (!signer) {
+      throw new Error('No signer available. Please connect to Hardhat or MetaMask.');
     }
 
     setLoading(true);
@@ -130,8 +132,8 @@ export const useBlockchain = () => {
   };
 
   const issueCertificate = async (certId: string, batchId: string, issuer: string) => {
-    if (!isConnected || !signer) {
-      throw new Error('Wallet not connected');
+    if (!signer) {
+      throw new Error('No signer available. Please connect to Hardhat or MetaMask.');
     }
 
     setLoading(true);

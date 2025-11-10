@@ -179,6 +179,31 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'message': 'Cannot connect to blockchain node. Check the error details above.'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+    @action(detail=False, methods=['get'], url_path='verify-batch/(?P<batch_id>[^/.]+)')
+    def verify_batch_from_blockchain(self, request, batch_id=None):
+        """Read batch data from blockchain via backend (no wallet needed)."""
+        try:
+            blockchain_data = get_batch_from_chain(batch_id)
+            
+            if blockchain_data:
+                return Response({
+                    'found': True,
+                    'data': blockchain_data,
+                    'message': 'Batch found on blockchain'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'found': False,
+                    'message': 'Batch not found on blockchain'
+                }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error reading batch from blockchain: {str(e)}")
+            return Response({
+                'found': False,
+                'error': str(e),
+                'message': 'Failed to read batch from blockchain'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class LabTestViewSet(viewsets.ModelViewSet):
     queryset = LabTest.objects.all()

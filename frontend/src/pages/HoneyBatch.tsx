@@ -44,9 +44,21 @@ const HoneyBatch = () => {
   const [loading, setLoading] = useState(true);
   const [blockchainData, setBlockchainData] = useState<BlockchainBatchData | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{connected: boolean; message?: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { verifyBatch } = useBlockchain();
-  const { isConnected } = useWeb3();
+  const { 
+    isConnected, 
+    signer, 
+    provider, 
+    hardhatConnected, 
+    hardhatConnectionError,
+    isConnecting,
+    connectToHardhat,
+    checkHardhatConnection 
+  } = useWeb3();
 
   const trustFactors = [
     "Blockchain records confirmed across all checkpoints",
@@ -99,12 +111,96 @@ const HoneyBatch = () => {
   const verifyOnBlockchain = async (batchId: string) => {
     try {
       setVerifying(true);
-      const data = await verifyBatch(batchId) as BlockchainBatchData | null;
-      setBlockchainData(data);
-    } catch (err) {
+      
+      // Try backend API first (no wallet needed)
+      try {
+        const response = await api.get(`/batches/verify-batch/${batchId}/`);
+        if (response.data.found) {
+          setBlockchainData({
+            batchId: response.data.data.batchId,
+            description: response.data.data.description,
+            timestamp: response.data.data.timestamp.toString(),
+            createdBy: response.data.data.createdBy,
+          });
+          toast.success('Batch verified on blockchain!');
+          return;
+        }
+      } catch (apiErr: any) {
+        // If backend verification fails, try frontend (requires wallet)
+        if (isConnected && (signer || provider)) {
+          const data = await verifyBatch(batchId) as BlockchainBatchData | null;
+          setBlockchainData(data);
+          if (data) {
+            toast.success('Batch verified on blockchain!');
+            return;
+          }
+        }
+        throw apiErr;
+      }
+      
+      toast.error('Batch not found on blockchain');
+    } catch (err: any) {
       console.error("Blockchain verification failed:", err);
+      const errorMsg = err?.response?.data?.message || err?.message || 'Failed to verify batch on blockchain';
+      toast.error(errorMsg);
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const testBlockchainConnection = async () => {
+    try {
+      setTestingConnection(true);
+      setConnectionStatus(null);
+      
+      // First try frontend direct connection to Hardhat
+      const frontendConnected = await checkHardhatConnection();
+      
+      if (frontendConnected) {
+        // Get network details
+        if (provider) {
+          try {
+            const network = await provider.getNetwork();
+            const blockNumber = await provider.getBlockNumber();
+            setConnectionStatus({
+              connected: true,
+              message: `Connected to Hardhat (Chain ID: ${network.chainId}, Block: ${blockNumber})`
+            });
+            toast.success('Hardhat connection successful!');
+            return;
+          } catch (err) {
+            console.error('Error getting network details:', err);
+          }
+        }
+      }
+      
+      // Fallback to backend API test
+      try {
+        const response = await api.get('/batches/test-blockchain-connection/');
+        
+        if (response.data.status === 'connected') {
+          setConnectionStatus({
+            connected: true,
+            message: `Connected via backend (Chain ID: ${response.data.chain_id}, Block: ${response.data.block_number})`
+          });
+          toast.success('Blockchain connection successful!');
+        } else {
+          setConnectionStatus({
+            connected: false,
+            message: response.data.error || 'Connection failed'
+          });
+          toast.error('Blockchain connection failed');
+        }
+      } catch (apiErr: any) {
+        const errorMsg = hardhatConnectionError || apiErr?.response?.data?.message || apiErr?.message || 'Failed to test connection';
+        setConnectionStatus({
+          connected: false,
+          message: errorMsg
+        });
+        toast.error(errorMsg);
+      }
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -194,14 +290,75 @@ const HoneyBatch = () => {
               <CardTitle>Blockchain Verification</CardTitle>
               <CardDescription>Confirm on-chain data integrity</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Connection Test Section */}
+              <div className="border-b border-border pb-3 space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Connection Status</p>
+                  <div className="flex gap-2">
+                    {!hardhatConnected && (
+                      <Button
+                        onClick={connectToHardhat}
+                        size="sm"
+                        variant="outline"
+                        disabled={testingConnection || isConnecting}
+                      >
+                        Connect to Hardhat
+                      </Button>
+                    )}
+                    <Button
+                      onClick={testBlockchainConnection}
+                      size="sm"
+                      variant="outline"
+                      disabled={testingConnection}
+                    >
+                      {testingConnection ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Hardhat connection status */}
+                {hardhatConnected && (
+                  <Alert className="border-green-500 bg-green-50">
+                    <AlertDescription className="text-green-700">
+                      ✓ Connected to Hardhat node
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {hardhatConnectionError && !hardhatConnected && (
+                  <Alert className="border-yellow-500 bg-yellow-50">
+                    <AlertDescription className="text-yellow-700">
+                      ⚠ {hardhatConnectionError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Test result */}
+                {connectionStatus && (
+                  <Alert className={connectionStatus.connected ? 'border-green-500' : 'border-red-500'}>
+                    <AlertDescription className={connectionStatus.connected ? 'text-green-700' : 'text-red-700'}>
+                      {connectionStatus.connected ? '✓ ' : '✗ '}
+                      {connectionStatus.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
               {batch?.blockchain_tx_hash ? (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                     <p className="text-sm font-semibold">Blockchain Verified</p>
                   </div>
-                  <p className="text-xs break-all">
+                  <p className="text-xs break-all mb-2">
                     TX Hash: {batch.blockchain_tx_hash}
                   </p>
 
@@ -214,12 +371,12 @@ const HoneyBatch = () => {
                     </Alert>
                   )}
 
-                  {!blockchainData && isConnected && !verifying && (
+                  {!blockchainData && !verifying && (
                     <Button
                       onClick={() => verifyOnBlockchain(batch.batch_id)}
                       size="sm"
                       variant="outline"
-                      className="mt-2"
+                      className="mt-2 w-full"
                     >
                       Verify on Blockchain
                     </Button>
@@ -249,23 +406,34 @@ const HoneyBatch = () => {
                       <Button
                         onClick={async () => {
                           if (!batch) return;
+                          setRecording(true);
+                          setError(null);
                           try {
+                            console.log('Recording batch on blockchain:', batch.batch_id);
+                            
                             // Create description from batch data
                             const description = `${batch.honey_type || 'Honey'} - ${batch.producer_name || 'Unknown'} - Qty: ${batch.quantity || 0}kg`;
+                            
+                            console.log('Calling API:', `/batches/${batch.id || batch.batch_id}/record-on-chain/`);
                             
                             // Call backend API to record on blockchain
                             const response = await api.post(`/batches/${batch.id || batch.batch_id}/record-on-chain/`, {
                               description,
                             });
                             
+                            console.log('API Response:', response.data);
+                            
                             // Update batch with blockchain tx hash
                             if (response.data.blockchain_tx_hash) {
                               setBatch({ ...batch, blockchain_tx_hash: response.data.blockchain_tx_hash });
                               toast.success(response.data.message || 'Batch recorded on blockchain successfully!');
+                              // Refresh the page data
+                              await fetchBatch(batch.batch_id);
                             } else if (response.data.message) {
                               toast.info(response.data.message);
                             }
                           } catch (err: any) {
+                            console.error('Error recording batch:', err);
                             const errorData = err?.response?.data;
                             let errorMsg = errorData?.message || errorData?.error || err?.message || 'Failed to record batch on blockchain';
                             
@@ -286,17 +454,32 @@ const HoneyBatch = () => {
                               }
                             }
                             
+                            setError(errorMsg);
                             toast.error(errorMsg, {
                               duration: 10000, // Show longer for detailed errors
                             });
+                          } finally {
+                            setRecording(false);
                           }
                         }}
                         variant="honey"
                         className="w-full"
-                        disabled={!batch}
+                        disabled={!batch || recording}
                       >
-                        Record on Blockchain
+                        {recording ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Recording...
+                          </>
+                        ) : (
+                          'Record on Blockchain'
+                        )}
                       </Button>
+                      {error && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertDescription className="text-xs">{error}</AlertDescription>
+                        </Alert>
+                      )}
                     </div>
                   )}
                 </div>
