@@ -5,6 +5,7 @@ import HeroSection from "@/components/HeroSection";
 import { Shield, Sparkles, Map, TrendingUp, ArrowRight, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { navigateToFirstBatch } from "@/utils/batchNavigation";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -126,7 +127,9 @@ const Index = () => {
                 size="lg" 
                 variant="honey"
                 className="group"
-                onClick={() => navigate("/batch/sample")}
+                onClick={async () => {
+                  await navigateToFirstBatch(navigate);
+                }}
               >
                 View Sample Batch
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

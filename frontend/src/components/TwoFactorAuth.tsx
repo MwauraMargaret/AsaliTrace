@@ -1,41 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-//import { supabase } from '@/integrations/supabase/client';
 import { Shield, AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import api from '@/services/api';
 
 const TwoFactorAuth = () => {
   const [loading, setLoading] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [factorsEnabled, setFactorsEnabled] = useState(false);
-  const { toast } = useToast();
+  const [checkingStatus, setCheckingStatus] = useState(true);
+
+  useEffect(() => {
+    check2FAStatus();
+  }, []);
+
+  const check2FAStatus = async () => {
+    try {
+      // Check if 2FA is already enabled
+      // This would require a backend endpoint to check 2FA status
+      // For now, we'll assume it's disabled
+      setFactorsEnabled(false);
+    } catch (error) {
+      // Silently fail - assume 2FA is not enabled
+      setFactorsEnabled(false);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   const enrollMFA = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-      });
-
-      if (error) throw error;
-
-      if (data) {
-        setQrCode(data.totp.qr_code);
-        setSecret(data.totp.secret);
-        toast({
-          title: "2FA Setup Started",
-          description: "Scan the QR code with your authenticator app",
+      const response = await api.post('/auth/2fa/setup/');
+      
+      if (response.data.qr_code) {
+        setQrCode(response.data.qr_code);
+        setSecret(response.data.secret || null);
+        toast.success('2FA Setup Started', {
+          description: 'Scan the QR code with your authenticator app',
         });
       }
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          'Failed to setup 2FA. Please try again.';
+      toast.error('Error', {
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -45,28 +58,24 @@ const TwoFactorAuth = () => {
   const verifyAndEnable = async (code: string) => {
     setLoading(true);
     try {
-      const factors = await supabase.auth.mfa.listFactors();
-      if (factors.data && factors.data.totp.length > 0) {
-        const factorId = factors.data.totp[0].id;
+      const response = await api.post('/auth/2fa/verify-setup/', {
+        token: code,
+      });
 
-        const { error } = await supabase.auth.mfa.challengeAndVerify({
-          factorId,
-          code,
-        });
-
-        if (error) throw error;
-
+      if (response.data.success) {
         setFactorsEnabled(true);
-        toast({
-          title: "2FA Enabled",
-          description: "Two-factor authentication is now active",
+        setQrCode(null);
+        setSecret(null);
+        toast.success('2FA Enabled', {
+          description: 'Two-factor authentication is now active',
         });
       }
     } catch (error: any) {
-      toast({
-        title: "Verification Failed",
-        description: error.message,
-        variant: "destructive",
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          'Verification failed. Please check your code and try again.';
+      toast.error('Verification Failed', {
+        description: errorMessage,
       });
     } finally {
       setLoading(false);

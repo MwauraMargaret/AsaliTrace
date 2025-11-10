@@ -20,4 +20,8 @@ urlpatterns = [
     path('social/google/', social_views.google_auth, name='google_auth'),
     path('social/github/', social_views.github_auth, name='github_auth'),
     path('social/apple/', social_views.apple_auth, name='apple_auth'),
+    
+    # Alternative paths for frontend compatibility
+    path('social/google', social_views.google_auth, name='google_auth_alt'),
+    path('social/github', social_views.github_auth, name='github_auth_alt'),
 ]

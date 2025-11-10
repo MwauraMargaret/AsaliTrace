@@ -37,7 +37,7 @@ const Auth = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('signin');
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, socialLogin } = useAuth();
 
   const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>, isSignUp: boolean) => {
     e.preventDefault();
@@ -98,18 +98,54 @@ const Auth = () => {
     }
   };
 
-  // For social auth, you'll need to implement OAuth2 with Django
   const handleSocialAuth = async (provider: 'google' | 'apple' | 'github') => {
     setLoading(true);
     setError(null);
 
     try {
-      // Redirect to Django's OAuth endpoint
-      const oauthUrl = `http://localhost:8000/api/auth/oauth/${provider}/`;
-      window.location.href = oauthUrl;
-      // Note: The backend should handle the OAuth flow and redirect back to frontend
-    } catch (err) {
-      setError(`Social login with ${provider} is not available yet.`);
+      if (provider === 'github') {
+        // GitHub OAuth redirect flow
+        const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
+        if (!GITHUB_CLIENT_ID) {
+          throw new Error('GitHub Client ID not configured');
+        }
+        const redirectUri = `${window.location.origin}/auth/callback`;
+        const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
+        window.location.href = githubAuthUrl;
+        return;
+      }
+
+      if (provider === 'google') {
+        // For Google, we'll use a popup-based flow
+        // This requires Google OAuth2 library to be loaded
+        if (typeof window.gapi === 'undefined') {
+          throw new Error('Google OAuth library not loaded. Please configure Google OAuth.');
+        }
+
+        window.gapi.load('auth2', () => {
+          window.gapi.auth2.init({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          }).then(() => {
+            const authInstance = window.gapi.auth2.getAuthInstance();
+            authInstance.signIn().then(async (googleUser: any) => {
+              const accessToken = googleUser.getAuthResponse().access_token;
+              await socialLogin('google', accessToken);
+              setLoading(false);
+            }).catch((err: any) => {
+              setError('Google authentication failed');
+              setLoading(false);
+            });
+          });
+        });
+        return;
+      }
+
+      if (provider === 'apple') {
+        setError('Apple Sign In is not yet implemented');
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || `Social login with ${provider} failed`);
       console.error('Social auth error:', err);
       setLoading(false);
     }

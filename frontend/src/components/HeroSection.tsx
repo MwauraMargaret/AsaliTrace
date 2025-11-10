@@ -55,7 +55,7 @@ const HeroSection = () => {
                 size="lg" 
                 variant="honey" 
                 className="group"
-                onClick={() => navigate('/batch/sample')}
+                onClick={() => navigate('/batches')}
               >
                 Trace Your Honey
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

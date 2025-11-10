@@ -44,8 +44,12 @@ export default api;
 
 // ---------- BATCHES ----------
 export const createBatch = async (batchData: {
-  batchId: string;
-  description: string;
+  batch_id: string;
+  producer_name: string;
+  production_date: string;
+  honey_type: string;
+  quantity: string;
+  status?: string;
 }) => {
   const res = await api.post('/batches/', batchData);
   return res.data; // includes blockchain_tx_hash if backend integrated
