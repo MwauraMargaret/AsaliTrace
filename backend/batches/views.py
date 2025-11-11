@@ -133,23 +133,40 @@ class BatchViewSet(viewsets.ModelViewSet):
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Blockchain error recording batch {batch.batch_id}: {error_msg}")
+            logger.error(f"Full exception details: {type(e).__name__}: {error_msg}")
             
-            # Provide more specific error messages
-            if "PRIVATE_KEY" in error_msg or "PUBLIC_ADDRESS" in error_msg or "CONTRACT_ADDRESS" in error_msg:
-                help_msg = "Please check your .env file and ensure all blockchain environment variables are set."
-            elif "Cannot connect" in error_msg or "Cannot communicate" in error_msg:
-                help_msg = "Please verify: 1) Hardhat node is running (npx hardhat node), 2) RPC URL is correct, 3) No firewall blocking connection."
+            # Check environment variables
+            has_private_key = bool(os.getenv("PRIVATE_KEY"))
+            has_public_address = bool(os.getenv("PUBLIC_ADDRESS"))
+            has_contract_address = bool(os.getenv("CONTRACT_ADDRESS"))
+            rpc_url = os.getenv("BLOCKCHAIN_RPC_URL", "http://127.0.0.1:8545")
+            
+            # Provide more specific error messages based on error type
+            if "PRIVATE_KEY" in error_msg or not has_private_key:
+                help_msg = "PRIVATE_KEY environment variable is missing. Please set it in your backend .env file."
+            elif "PUBLIC_ADDRESS" in error_msg or not has_public_address:
+                help_msg = "PUBLIC_ADDRESS environment variable is missing. Please set it in your backend .env file."
+            elif "CONTRACT_ADDRESS" in error_msg or not has_contract_address:
+                help_msg = "CONTRACT_ADDRESS environment variable is missing. Please deploy the contract and set the address in your backend .env file."
+            elif "Cannot connect" in error_msg or "Cannot communicate" in error_msg or "Connection refused" in error_msg:
+                help_msg = f"Cannot connect to Hardhat node at {rpc_url}. Please verify: 1) Hardhat node is running (npx hardhat node), 2) RPC URL is correct, 3) No firewall blocking connection."
+            elif "ABI not found" in error_msg or "Contract ABI" in error_msg:
+                help_msg = "Contract ABI file not found. Please ensure the contract is compiled and the ABI file exists."
+            elif "Transaction failed" in error_msg:
+                help_msg = "Blockchain transaction failed. Check Hardhat node logs for details."
             else:
-                help_msg = "Make sure the Hardhat node is running: npx hardhat node"
+                help_msg = f"Blockchain error: {error_msg}. Please verify: 1) Hardhat node is running (npx hardhat node), 2) All environment variables are set, 3) Contract is deployed."
             
             return Response({
                 'error': error_msg,
                 'message': help_msg,
                 'details': {
-                    'rpc_url': os.getenv("BLOCKCHAIN_RPC_URL", "http://127.0.0.1:8545"),
-                    'has_private_key': bool(os.getenv("PRIVATE_KEY")),
-                    'has_public_address': bool(os.getenv("PUBLIC_ADDRESS")),
-                    'has_contract_address': bool(os.getenv("CONTRACT_ADDRESS")),
+                    'rpc_url': rpc_url,
+                    'has_private_key': has_private_key,
+                    'has_public_address': has_public_address,
+                    'has_contract_address': has_contract_address,
+                    'contract_address': os.getenv("CONTRACT_ADDRESS") if has_contract_address else None,
+                    'error_type': type(e).__name__,
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

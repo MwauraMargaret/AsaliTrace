@@ -410,14 +410,24 @@ const HoneyBatch = () => {
                           setError(null);
                           try {
                             console.log('Recording batch on blockchain:', batch.batch_id);
+                            console.log('Batch object:', batch);
+                            
+                            // Ensure we have the numeric ID (primary key) for the API endpoint
+                            // The DRF ViewSet expects the database primary key, not batch_id
+                            const batchPk = batch.id;
+                            if (!batchPk) {
+                              throw new Error('Batch ID not found. Please refresh the page and try again.');
+                            }
                             
                             // Create description from batch data
                             const description = `${batch.honey_type || 'Honey'} - ${batch.producer_name || 'Unknown'} - Qty: ${batch.quantity || 0}kg`;
                             
-                            console.log('Calling API:', `/batches/${batch.id || batch.batch_id}/record-on-chain/`);
+                            const apiUrl = `/batches/${batchPk}/record-on-chain/`;
+                            console.log('Calling API:', apiUrl);
+                            console.log('Request payload:', { description });
                             
                             // Call backend API to record on blockchain
-                            const response = await api.post(`/batches/${batch.id || batch.batch_id}/record-on-chain/`, {
+                            const response = await api.post(apiUrl, {
                               description,
                             });
                             
@@ -433,25 +443,56 @@ const HoneyBatch = () => {
                               toast.info(response.data.message);
                             }
                           } catch (err: any) {
+                            // Log full error details for debugging
                             console.error('Error recording batch:', err);
-                            const errorData = err?.response?.data;
-                            let errorMsg = errorData?.message || errorData?.error || err?.message || 'Failed to record batch on blockchain';
+                            console.error('Error response:', err?.response);
+                            console.error('Error response data:', err?.response?.data);
+                            console.error('Error status:', err?.response?.status);
+                            console.error('Error message:', err?.message);
                             
-                            // Add details if available
-                            if (errorData?.details) {
-                              const details = errorData.details;
-                              const missing = [];
-                              if (!details.has_private_key) missing.push('PRIVATE_KEY');
-                              if (!details.has_public_address) missing.push('PUBLIC_ADDRESS');
-                              if (!details.has_contract_address) missing.push('CONTRACT_ADDRESS');
+                            // Handle different error types
+                            let errorMsg = 'Failed to record batch on blockchain';
+                            const errorData = err?.response?.data;
+                            const status = err?.response?.status;
+                            
+                            // Network error (backend not reachable)
+                            if (!err?.response) {
+                              errorMsg = `Cannot connect to backend server. Please ensure the Django backend is running at ${import.meta.env.VITE_DJANGO_API_URL || 'http://localhost:8000'}`;
+                            }
+                            // HTTP error responses
+                            else if (errorData) {
+                              errorMsg = errorData?.message || errorData?.error || errorData?.detail || err?.message || errorMsg;
                               
-                              if (missing.length > 0) {
-                                errorMsg += `\nMissing environment variables: ${missing.join(', ')}`;
+                              // Add details if available
+                              if (errorData?.details) {
+                                const details = errorData.details;
+                                const missing = [];
+                                if (!details.has_private_key) missing.push('PRIVATE_KEY');
+                                if (!details.has_public_address) missing.push('PUBLIC_ADDRESS');
+                                if (!details.has_contract_address) missing.push('CONTRACT_ADDRESS');
+                                
+                                if (missing.length > 0) {
+                                  errorMsg += `\nMissing environment variables: ${missing.join(', ')}`;
+                                }
+                                
+                                if (details.rpc_url) {
+                                  errorMsg += `\nRPC URL: ${details.rpc_url}`;
+                                }
                               }
                               
-                              if (details.rpc_url) {
-                                errorMsg += `\nRPC URL: ${details.rpc_url}`;
+                              // Add status code context
+                              if (status === 503) {
+                                errorMsg = `Blockchain service unavailable. ${errorMsg}`;
+                              } else if (status === 404) {
+                                errorMsg = `Batch not found. ${errorMsg}`;
+                              } else if (status === 401) {
+                                errorMsg = `Authentication required. Please log in again.`;
+                              } else if (status === 500) {
+                                errorMsg = `Server error: ${errorMsg}`;
                               }
+                            } else {
+                              // Fallback error message
+                              errorMsg = err?.message || `HTTP ${status}: ${errorMsg}`;
                             }
                             
                             setError(errorMsg);

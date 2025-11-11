@@ -138,7 +138,21 @@ def add_batch_to_chain(batch_id, description):
         signed_tx = web3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY)
         
         # Send transaction
-        tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        # eth-account v0.13.0+ uses raw_transaction (snake_case)
+        # Older versions use rawTransaction (camelCase)
+        # Check for raw_transaction first (newer versions)
+        if hasattr(signed_tx, 'raw_transaction'):
+            raw_tx = signed_tx.raw_transaction
+        elif hasattr(signed_tx, 'rawTransaction'):
+            raw_tx = signed_tx.rawTransaction
+        else:
+            raise ValueError(
+                "Cannot find raw transaction attribute. "
+                "SignedTransaction object has neither 'raw_transaction' nor 'rawTransaction'. "
+                "Please check eth-account library version."
+            )
+        
+        tx_hash = web3.eth.send_raw_transaction(raw_tx)
         tx_hash_hex = web3.to_hex(tx_hash)
         
         logger.info(f"Transaction sent: {tx_hash_hex}")
