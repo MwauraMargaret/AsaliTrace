@@ -2,9 +2,46 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Sparkles } from "lucide-react";
 import heroImage from "@/assets/hero-honey.jpg";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { getStatistics } from "@/services/api";
+
+interface Statistics {
+  total_batches: number;
+  verified_batches: number;
+  verified_percentage: number;
+  unique_producers: number;
+  total_lab_tests?: number;
+  verified_lab_tests?: number;
+  total_certificates?: number;
+  verified_certificates?: number;
+}
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState<Statistics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getStatistics();
+        setStats(data);
+      } catch (err) {
+        console.error("Failed to load statistics:", err);
+        // Set default values if API fails
+        setStats({
+          total_batches: 0,
+          verified_batches: 0,
+          verified_percentage: 0,
+          unique_producers: 0,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -55,7 +92,7 @@ const HeroSection = () => {
                 size="lg" 
                 variant="honey" 
                 className="group"
-                onClick={() => navigate('/batch/sample')}
+                onClick={() => navigate('/batches')}
               >
                 Trace Your Honey
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -72,17 +109,35 @@ const HeroSection = () => {
 
             <div className="flex items-center gap-8 pt-4">
               <div>
-                <div className="text-3xl font-bold text-primary">XX%</div>
+                <div className="text-3xl font-bold text-primary">
+                  {loading ? (
+                    <span className="animate-pulse">--</span>
+                  ) : (
+                    `${stats?.verified_percentage || 0}%`
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground">Verified Authentic</div>
               </div>
               <div className="h-12 w-px bg-border" />
               <div>
-                <div className="text-3xl font-bold text-primary">XXX</div>
+                <div className="text-3xl font-bold text-primary">
+                  {loading ? (
+                    <span className="animate-pulse">---</span>
+                  ) : (
+                    stats?.total_batches || 0
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground">Traced Batches</div>
               </div>
               <div className="h-12 w-px bg-border" />
               <div>
-                <div className="text-3xl font-bold text-primary">XXX+</div>
+                <div className="text-3xl font-bold text-primary">
+                  {loading ? (
+                    <span className="animate-pulse">---</span>
+                  ) : (
+                    `${stats?.unique_producers || 0}${stats && stats.unique_producers > 0 ? '+' : ''}`
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground">Partner Beekeepers</div>
               </div>
             </div>

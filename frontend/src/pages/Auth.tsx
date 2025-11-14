@@ -37,7 +37,7 @@ const Auth = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('signin');
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, socialLogin } = useAuth();
 
   const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>, isSignUp: boolean) => {
     e.preventDefault();
@@ -85,7 +85,7 @@ const Auth = () => {
     try {
       if (isSignUp) {
         await register(email, password, firstName, lastName);
-        setSuccess('Account created successfully! Welcome to HoneyTrace.');
+        setSuccess('Account created successfully! Welcome to AsaliTrace.');
       } else {
         await login(email, password);
         // Navigation will be handled by AuthContext after successful login
@@ -98,18 +98,63 @@ const Auth = () => {
     }
   };
 
-  // For social auth, you'll need to implement OAuth2 with Django
   const handleSocialAuth = async (provider: 'google' | 'apple' | 'github') => {
     setLoading(true);
     setError(null);
 
     try {
-      // Redirect to Django's OAuth endpoint
-      const oauthUrl = `http://localhost:8000/api/auth/oauth/${provider}/`;
-      window.location.href = oauthUrl;
-      // Note: The backend should handle the OAuth flow and redirect back to frontend
-    } catch (err) {
-      setError(`Social login with ${provider} is not available yet.`);
+      if (provider === 'github') {
+        // GitHub OAuth redirect flow
+        const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
+        if (!GITHUB_CLIENT_ID) {
+          throw new Error('GitHub Client ID not configured. Please set VITE_GITHUB_CLIENT_ID in your .env file.');
+        }
+        const redirectUri = `${window.location.origin}/auth/callback`;
+        const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
+        window.location.href = githubAuthUrl;
+        return;
+      }
+
+      if (provider === 'google') {
+        const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!GOOGLE_CLIENT_ID) {
+          throw new Error('Google Client ID not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.');
+        }
+
+        // For Google, we'll use a popup-based flow
+        // This requires Google OAuth2 library to be loaded
+        if (typeof window.gapi === 'undefined') {
+          throw new Error('Google OAuth library not loaded. Please wait a moment and try again.');
+        }
+
+        window.gapi.load('auth2', () => {
+          window.gapi.auth2.init({
+            client_id: GOOGLE_CLIENT_ID,
+          }).then(() => {
+            const authInstance = window.gapi.auth2.getAuthInstance();
+            authInstance.signIn().then(async (googleUser: any) => {
+              const accessToken = googleUser.getAuthResponse().access_token;
+              await socialLogin('google', accessToken);
+              setLoading(false);
+            }).catch((err: any) => {
+              setError('Google authentication failed');
+              setLoading(false);
+            });
+          }).catch((err: any) => {
+            setError('Failed to initialize Google OAuth');
+            setLoading(false);
+          });
+        });
+        return;
+      }
+
+      if (provider === 'apple') {
+        setError('Apple Sign In is not yet implemented. Please use email or other sign-in methods.');
+        setLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      setError(err.message || `Social login with ${provider} failed`);
       console.error('Social auth error:', err);
       setLoading(false);
     }
@@ -127,7 +172,7 @@ const Auth = () => {
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-4xl">🍯</span>
             <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-              HoneyTrace
+              AsaliTrace
             </span>
           </div>
           <CardTitle className="text-2xl">Welcome</CardTitle>
@@ -247,8 +292,9 @@ const Auth = () => {
                 <Button
                   variant="outline"
                   onClick={() => handleSocialAuth('apple')}
-                  disabled={loading}
-                  className="w-full border-gray-300 hover:bg-gray-50"
+                  disabled={true}
+                  className="w-full border-gray-300 hover:bg-gray-50 opacity-50 cursor-not-allowed"
+                  title="Apple Sign In is not yet implemented"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
@@ -380,8 +426,9 @@ const Auth = () => {
                 <Button
                   variant="outline"
                   onClick={() => handleSocialAuth('apple')}
-                  disabled={loading}
-                  className="w-full border-gray-300 hover:bg-gray-50"
+                  disabled={true}
+                  className="w-full border-gray-300 hover:bg-gray-50 opacity-50 cursor-not-allowed"
+                  title="Apple Sign In is not yet implemented"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>

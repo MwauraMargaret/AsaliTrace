@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 
 interface User {
-  id: string;
+  id: string | number;
   email: string;
   first_name: string;
   last_name: string;
@@ -14,6 +14,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  socialLogin: (provider: 'google' | 'github', accessToken: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -67,7 +68,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('refresh_token', refresh);
       setUser(userData);
       
-      navigate('/dashboard');
+      navigate('/');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
     }
@@ -88,9 +89,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('refresh_token', refresh);
       setUser(userData);
       
-      navigate('/dashboard');
+      navigate('/');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed');
+    }
+  };
+
+  const socialLogin = async (provider: 'google' | 'github', accessToken: string) => {
+    try {
+      const response = await api.post(`/auth/social/${provider}/`, {
+        access_token: accessToken,
+      });
+
+      const { access, refresh, user: userData } = response.data;
+      
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+      setUser(userData);
+      
+      navigate('/');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Social login failed');
     }
   };
 
@@ -105,6 +124,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     login,
     register,
+    socialLogin,
     logout,
     loading,
   };
