@@ -4,9 +4,9 @@ from rest_framework.routers import DefaultRouter
 from .views import BatchViewSet, LabTestViewSet, CertificateViewSet
 
 router = DefaultRouter()
-router.register(r'batches', BatchViewSet)
-router.register(r'labtests', LabTestViewSet)
-router.register(r'certificates', CertificateViewSet)
+router.register(r'batches', BatchViewSet, basename='batch')
+router.register(r'labtests', LabTestViewSet, basename='labtest')
+router.register(r'certificates', CertificateViewSet, basename='certificate')
 
 urlpatterns = [
     path('', include(router.urls)),
