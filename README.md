@@ -58,7 +58,7 @@ AsaliTrace is an innovative **three-tier blockchain-based supply chain managemen
 
 ---
 
-## ✨ Features
+## Features
 
 ### Core Features
 
@@ -148,7 +148,7 @@ AsaliTrace follows a **three-tier architecture**:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Frontend Tier                        │
-│  React + TypeScript + Ethers.js + TailwindCSS         │
+│  React + TypeScript + Ethers.js + TailwindCSS           │
 │  - User Interface                                       │
 │  - Wallet Integration (MetaMask)                        │
 │  - API Communication                                    │
@@ -157,11 +157,11 @@ AsaliTrace follows a **three-tier architecture**:
                    │ (JWT Authentication)
 ┌──────────────────▼──────────────────────────────────────┐
 │                    Backend Tier                         │
-│  Django REST Framework + Web3.py                       │
+│  Django REST Framework + Web3.py                        │
 │  - Business Logic                                       │
 │  - API Endpoints                                        │
 │  - Database Management                                  │
-│  - Blockchain Adapter                                    │
+│  - Blockchain Adapter                                   │
 └──────────────────┬──────────────────────────────────────┘
                    │ Web3 RPC
                    │ (Ethereum JSON-RPC)
@@ -170,7 +170,7 @@ AsaliTrace follows a **three-tier architecture**:
 │  Ethereum Smart Contracts (Hardhat)                     │
 │  - Immutable Batch Records                              │
 │  - Lab Test Records                                     │
-│  - Certificate Records                                   │
+│  - Certificate Records                                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -412,7 +412,7 @@ VITE_GITHUB_CLIENT_ID=your-github-client-id
 
 ### Getting OAuth Client IDs
 
-See [OAUTH_SETUP_GUIDE.md](./OAUTH_SETUP_GUIDE.md) for detailed instructions on obtaining Google and GitHub OAuth Client IDs.
+//
 
 ---
 
@@ -636,7 +636,7 @@ docker-compose down
 
 ### Manual Deployment
 
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed deployment instructions.
+//
 
 ### Environment-Specific Settings
 
@@ -717,10 +717,6 @@ python scripts/test_blockchain_integration.py
 - **Blockchain Logs**: Check Hardhat node output
 - **Network Requests**: Use browser DevTools Network tab
 
-For more troubleshooting help, see:
-- [BLOCKCHAIN_TROUBLESHOOTING_GUIDE.md](./BLOCKCHAIN_TROUBLESHOOTING_GUIDE.md)
-- [AUTHENTICATION_DEBUGGING_GUIDE.md](./AUTHENTICATION_DEBUGGING_GUIDE.md)
-
 ---
 
 ## 🤝 Contributing
@@ -750,13 +746,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 ## 💬 Support
-
-### Documentation
-
-- [OAuth Setup Guide](./OAUTH_SETUP_GUIDE.md)
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
-- [Blockchain Troubleshooting](./BLOCKCHAIN_TROUBLESHOOTING_GUIDE.md)
-- [Authentication Guide](./AUTHENTICATION_DEBUGGING_GUIDE.md)
 
 ### Getting Help
 
@@ -798,6 +787,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for transparent honey supply chains**
 
-[⭐ Star us on GitHub](https://github.com/<username>/AsaliTrace) | [📖 Documentation](./docs) | [🐛 Report Bug](https://github.com/<username>/AsaliTrace/issues)
+[⭐ Star us on GitHub](https://github.com/mwauramargaret/AsaliTrace) | [📖 Documentation](./docs) | [🐛 Report Bug](https://github.com/mwauramargaret/AsaliTrace/issues)
 
 </div>
