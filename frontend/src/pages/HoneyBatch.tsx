@@ -10,7 +10,7 @@ import JourneyMap from "@/components/JourneyMap";
 //import AIQualityAnalyzer from "@/components/AIQualityAnalyzer";
 //import BeekeeperProfile from "@/components/BeekeeperProfile";
 //import TrustScore from "@/components/TrustScore";
-import { getBatchById, getBatches } from "@/services/api";
+import { getBatchById, getBatches, createLabTest, getLabTests, issueCertificate, getCertificates } from "@/services/api";
 import { useBlockchain } from "@/hooks/useBlockchain";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { toast } from "sonner";
@@ -36,6 +36,26 @@ interface BlockchainBatchData {
   createdBy: string;
 }
 
+interface LabTest {
+  id?: number;
+  batch?: number;
+  test_type: string;
+  result: string;
+  tested_by: string;
+  test_date: string;
+  blockchain_tx_hash?: string | null;
+}
+
+interface Certificate {
+  id?: number;
+  batch?: number;
+  certificate_id: string;
+  issued_by: string;
+  issue_date: string;
+  expiry_date: string;
+  blockchain_tx_hash?: string | null;
+}
+
 const HoneyBatch = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -48,6 +68,24 @@ const HoneyBatch = () => {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<{connected: boolean; message?: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
+  const [showLabTestForm, setShowLabTestForm] = useState(false);
+  const [creatingLabTest, setCreatingLabTest] = useState(false);
+  const [labTestForm, setLabTestForm] = useState({
+    test_type: '',
+    result: '',
+    tested_by: '',
+    test_date: new Date().toISOString().split('T')[0],
+  });
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [showCertificateForm, setShowCertificateForm] = useState(false);
+  const [creatingCertificate, setCreatingCertificate] = useState(false);
+  const [certificateForm, setCertificateForm] = useState({
+    certificate_id: '',
+    issued_by: '',
+    issue_date: new Date().toISOString().split('T')[0],
+    expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 year from now
+  });
   const { verifyBatch } = useBlockchain();
   const { 
     isConnected, 
@@ -101,6 +139,22 @@ const HoneyBatch = () => {
 
       setBatch(data);
       if (data.blockchain_tx_hash && isConnected) verifyOnBlockchain(data.batch_id);
+      
+      // Fetch lab tests and certificates for this batch
+      if (data.id) {
+        try {
+          const tests = await getLabTests(data.id);
+          setLabTests(tests);
+        } catch (err) {
+          console.error("Failed to load lab tests:", err);
+        }
+        try {
+          const certs = await getCertificates(data.id);
+          setCertificates(certs);
+        } catch (err) {
+          console.error("Failed to load certificates:", err);
+        }
+      }
     } catch (err: any) {
       setError(err?.message || "Failed to load batch");
     } finally {
@@ -111,6 +165,12 @@ const HoneyBatch = () => {
   const verifyOnBlockchain = async (batchId: string) => {
     try {
       setVerifying(true);
+      
+      // Check if batch has blockchain_tx_hash first
+      if (!batch?.blockchain_tx_hash) {
+        toast.warning('This batch has not been recorded on the blockchain yet. Please record it first.');
+        return;
+      }
       
       // Try backend API first (no wallet needed)
       try {
@@ -124,25 +184,69 @@ const HoneyBatch = () => {
           });
           toast.success('Batch verified on blockchain!');
           return;
+        } else {
+          // Show detailed error message from backend
+          const errorData = response.data;
+          let errorMessage = errorData.message || 'Batch not found on blockchain.';
+          
+          if (errorData.tx_status === 0) {
+            errorMessage = `Transaction failed. ${errorData.message}`;
+            if (errorData.suggestion) {
+              errorMessage += ` ${errorData.suggestion}`;
+            }
+            toast.error(errorMessage, { duration: 8000 });
+          } else if (errorData.tx_status === 1) {
+            errorMessage = `Transaction succeeded but batch not found. ${errorData.message}`;
+            if (errorData.suggestion) {
+              errorMessage += ` ${errorData.suggestion}`;
+            }
+            toast.warning(errorMessage, { duration: 8000 });
+          } else {
+            toast.warning(errorMessage, { duration: 6000 });
+          }
+          return;
         }
       } catch (apiErr: any) {
         // If backend verification fails, try frontend (requires wallet)
         if (isConnected && (signer || provider)) {
-          const data = await verifyBatch(batchId) as BlockchainBatchData | null;
-          setBlockchainData(data);
-          if (data) {
-            toast.success('Batch verified on blockchain!');
-            return;
+          try {
+            const data = await verifyBatch(batchId) as BlockchainBatchData | null;
+            if (data) {
+              setBlockchainData(data);
+              toast.success('Batch verified on blockchain!');
+              return;
+            } else {
+              toast.warning('Batch not found on blockchain. It may not have been recorded yet.');
+              return;
+            }
+          } catch (frontendErr: any) {
+            // Handle specific error messages
+            if (frontendErr.message?.includes('could not decode') || 
+                frontendErr.message?.includes('value="0x"') ||
+                frontendErr.code === 'BAD_DATA') {
+              toast.warning('Batch not found on blockchain. It may not have been recorded yet.');
+              return;
+            }
+            throw frontendErr;
           }
+        }
+        // If no wallet connection, show helpful message
+        if (!isConnected) {
+          toast.warning('Batch not found on blockchain. Connect wallet or record batch first.');
+          return;
         }
         throw apiErr;
       }
-      
-      toast.error('Batch not found on blockchain');
     } catch (err: any) {
       console.error("Blockchain verification failed:", err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Failed to verify batch on blockchain';
-      toast.error(errorMsg);
+      
+      // Provide more helpful error messages
+      if (errorMsg.includes('could not decode') || errorMsg.includes('value="0x"')) {
+        toast.warning('Batch not found on blockchain. It may not have been recorded yet.');
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setVerifying(false);
     }
@@ -278,6 +382,364 @@ const HoneyBatch = () => {
         {/* Left section */}
         <div className="lg:col-span-2 space-y-8">
           <JourneyMap />
+          
+          {/* Lab Tests Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Lab Tests</CardTitle>
+                  <CardDescription>Quality test results for this batch</CardDescription>
+                </div>
+                {batch && (
+                  <Button
+                    onClick={() => setShowLabTestForm(!showLabTestForm)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {showLabTestForm ? 'Cancel' : '+ Add Lab Test'}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Lab Test Form */}
+              {showLabTestForm && batch && (
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Test Type</label>
+                        <input
+                          type="text"
+                          value={labTestForm.test_type}
+                          onChange={(e) => setLabTestForm({ ...labTestForm, test_type: e.target.value })}
+                          placeholder="e.g., Purity, Moisture, HMF"
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Test Date</label>
+                        <input
+                          type="date"
+                          value={labTestForm.test_date}
+                          onChange={(e) => setLabTestForm({ ...labTestForm, test_date: e.target.value })}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Tested By</label>
+                      <input
+                        type="text"
+                        value={labTestForm.tested_by}
+                        onChange={(e) => setLabTestForm({ ...labTestForm, tested_by: e.target.value })}
+                        placeholder="Laboratory name"
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Result</label>
+                      <textarea
+                        value={labTestForm.result}
+                        onChange={(e) => setLabTestForm({ ...labTestForm, result: e.target.value })}
+                        placeholder="Test results and findings"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                      />
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!batch?.id) return;
+                        setCreatingLabTest(true);
+                        try {
+                          const newTest = await createLabTest({
+                            batch: batch.id,
+                            test_type: labTestForm.test_type,
+                            result: labTestForm.result,
+                            tested_by: labTestForm.tested_by,
+                            test_date: labTestForm.test_date,
+                          });
+                          toast.success(
+                            newTest.blockchain_tx_hash
+                              ? 'Lab test created and recorded on blockchain!'
+                              : 'Lab test created (blockchain recording pending)'
+                          );
+                          setLabTests([...labTests, newTest]);
+                          setShowLabTestForm(false);
+                          setLabTestForm({
+                            test_type: '',
+                            result: '',
+                            tested_by: '',
+                            test_date: new Date().toISOString().split('T')[0],
+                          });
+                          // Refresh batch to get updated data
+                          await fetchBatch(batch.batch_id);
+                        } catch (err: any) {
+                          console.error('Error creating lab test:', err);
+                          toast.error(err?.response?.data?.message || 'Failed to create lab test');
+                        } finally {
+                          setCreatingLabTest(false);
+                        }
+                      }}
+                      variant="honey"
+                      className="w-full"
+                      disabled={creatingLabTest || !labTestForm.test_type || !labTestForm.result}
+                    >
+                      {creatingLabTest ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Lab Test'
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lab Tests List */}
+              {labTests.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    No lab tests recorded yet. Add a lab test to verify quality.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-3">
+                  {labTests.map((test) => (
+                    <Card key={test.id} className="bg-card">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline">{test.test_type}</Badge>
+                              {test.blockchain_tx_hash && (
+                                <Badge className="bg-green-500">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-1">
+                              Tested by: {test.tested_by}
+                            </p>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Date: {new Date(test.test_date).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm">{test.result}</p>
+                            {test.blockchain_tx_hash && (
+                              <p className="text-xs text-muted-foreground mt-2 break-all">
+                                TX: {test.blockchain_tx_hash.substring(0, 20)}...
+                              </p>
+                            )}
+                          </div>
+                          {!test.blockchain_tx_hash && batch && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  const response = await api.post(`/labtests/${test.id}/record-on-chain/`);
+                                  toast.success('Lab test recorded on blockchain!');
+                                  await fetchBatch(batch.batch_id);
+                                } catch (err: any) {
+                                  toast.error(err?.response?.data?.message || 'Failed to record on blockchain');
+                                }
+                              }}
+                            >
+                              Record on Chain
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Certificates Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Certificates</CardTitle>
+                  <CardDescription>Quality certificates for this batch</CardDescription>
+                </div>
+                {batch && (
+                  <Button
+                    onClick={() => setShowCertificateForm(!showCertificateForm)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {showCertificateForm ? 'Cancel' : '+ Issue Certificate'}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Certificate Form */}
+              {showCertificateForm && batch && (
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-6 space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Certificate ID</label>
+                      <input
+                        type="text"
+                        value={certificateForm.certificate_id}
+                        onChange={(e) => setCertificateForm({ ...certificateForm, certificate_id: e.target.value })}
+                        placeholder="e.g., CERT-2024-001"
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Issued By</label>
+                      <input
+                        type="text"
+                        value={certificateForm.issued_by}
+                        onChange={(e) => setCertificateForm({ ...certificateForm, issued_by: e.target.value })}
+                        placeholder="Certification authority name"
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Issue Date</label>
+                        <input
+                          type="date"
+                          value={certificateForm.issue_date}
+                          onChange={(e) => setCertificateForm({ ...certificateForm, issue_date: e.target.value })}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Expiry Date</label>
+                        <input
+                          type="date"
+                          value={certificateForm.expiry_date}
+                          onChange={(e) => setCertificateForm({ ...certificateForm, expiry_date: e.target.value })}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!batch?.id) return;
+                        setCreatingCertificate(true);
+                        try {
+                          const newCert = await issueCertificate({
+                            batch: batch.id,
+                            certificate_id: certificateForm.certificate_id,
+                            issued_by: certificateForm.issued_by,
+                            issue_date: certificateForm.issue_date,
+                            expiry_date: certificateForm.expiry_date,
+                          });
+                          toast.success(
+                            newCert.blockchain_tx_hash
+                              ? 'Certificate issued and recorded on blockchain!'
+                              : 'Certificate issued (blockchain recording pending)'
+                          );
+                          setCertificates([...certificates, newCert]);
+                          setShowCertificateForm(false);
+                          setCertificateForm({
+                            certificate_id: '',
+                            issued_by: '',
+                            issue_date: new Date().toISOString().split('T')[0],
+                            expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                          });
+                          // Refresh batch to get updated data
+                          await fetchBatch(batch.batch_id);
+                        } catch (err: any) {
+                          console.error('Error issuing certificate:', err);
+                          toast.error(err?.response?.data?.message || 'Failed to issue certificate');
+                        } finally {
+                          setCreatingCertificate(false);
+                        }
+                      }}
+                      variant="honey"
+                      className="w-full"
+                      disabled={creatingCertificate || !certificateForm.certificate_id || !certificateForm.issued_by}
+                    >
+                      {creatingCertificate ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Issuing...
+                        </>
+                      ) : (
+                        'Issue Certificate'
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Certificates List */}
+              {certificates.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    No certificates issued yet. Issue a certificate to verify authenticity.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-3">
+                  {certificates.map((cert) => (
+                    <Card key={cert.id} className="bg-card">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline">{cert.certificate_id}</Badge>
+                              {cert.blockchain_tx_hash && (
+                                <Badge className="bg-green-500">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-1">
+                              Issued by: {cert.issued_by}
+                            </p>
+                            <p className="text-sm text-muted-foreground mb-1">
+                              Issue Date: {new Date(cert.issue_date).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Expiry Date: {new Date(cert.expiry_date).toLocaleDateString()}
+                            </p>
+                            {cert.blockchain_tx_hash && (
+                              <p className="text-xs text-muted-foreground mt-2 break-all">
+                                TX: {cert.blockchain_tx_hash.substring(0, 20)}...
+                              </p>
+                            )}
+                          </div>
+                          {!cert.blockchain_tx_hash && batch && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  const response = await api.post(`/certificates/${cert.id}/record-on-chain/`);
+                                  toast.success('Certificate recorded on blockchain!');
+                                  await fetchBatch(batch.batch_id);
+                                } catch (err: any) {
+                                  toast.error(err?.response?.data?.message || 'Failed to record on blockchain');
+                                }
+                              }}
+                            >
+                              Record on Chain
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
           {/* <AIQualityAnalyzer /> */}
           {/* <BeekeeperProfile /> */}
         </div>

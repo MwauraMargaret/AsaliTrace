@@ -7,6 +7,8 @@ import { getBatches, createBatch } from "../services/api";
 const Batches = () => {
   const navigate = useNavigate();
   const [batches, setBatches] = useState([]);
+  const [filteredBatches, setFilteredBatches] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     batch_id: "",
@@ -14,7 +16,7 @@ const Batches = () => {
     production_date: "",
     honey_type: "",
     quantity: "",
-    status: "",
+    status: "created",
     blockchain_tx_hash: ""
   });
 
@@ -27,10 +29,20 @@ const Batches = () => {
     try {
       const data = await getBatches();
       setBatches(data);
+      setFilteredBatches(data);
     } catch (err) {
       console.error("Error fetching batches:", err);
     }
   };
+
+  // Filter batches by status
+  useEffect(() => {
+    if (statusFilter === "all") {
+      setFilteredBatches(batches);
+    } else {
+      setFilteredBatches(batches.filter(batch => batch.status === statusFilter));
+    }
+  }, [statusFilter, batches]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -56,7 +68,7 @@ const Batches = () => {
         production_date: "",
         honey_type: "",
         quantity: "",
-        status: "",
+        status: "created", // Reset to default
         blockchain_tx_hash: ""
       });
       
@@ -83,15 +95,33 @@ const Batches = () => {
     } catch (err) {
       console.error("Error creating batch:", err);
       
-      // Show error message
-      const errorMessage = err?.response?.data?.error || 
-                          err?.response?.data?.message || 
-                          err?.message || 
-                          "Failed to create batch. Please try again.";
+      // Log full error details for debugging
+      if (err?.response) {
+        console.error("Response status:", err.response.status);
+        console.error("Response data:", err.response.data);
+        console.error("Request payload:", form);
+      }
+      
+      // Show error message with detailed validation errors
+      let errorMessage = err?.response?.data?.message || 
+                        err?.message || 
+                        "Failed to create batch. Please try again.";
+      
+      // If validation errors, show field-specific errors
+      if (err?.response?.data && typeof err.response.data === 'object') {
+        const validationErrors = Object.entries(err.response.data)
+          .filter(([key]) => key !== 'message' && key !== 'error')
+          .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+          .join('; ');
+        
+        if (validationErrors) {
+          errorMessage = `Validation errors: ${validationErrors}`;
+        }
+      }
       
       toast.error("Failed to create batch", {
         description: errorMessage,
-        duration: 5000,
+        duration: 8000, // Longer duration for detailed errors
       });
     } finally {
       setIsSubmitting(false);
@@ -145,14 +175,17 @@ const Batches = () => {
           onChange={handleChange}
           className="border p-2 w-full"
         />
-        <input
-          type="text"
+        <select
           name="status"
-          placeholder="Status"
           value={form.status}
           onChange={handleChange}
           className="border p-2 w-full"
-        />
+        >
+          <option value="created">Created</option>
+          <option value="tested">Tested</option>
+          <option value="certified">Certified</option>
+          <option value="shipped">Shipped</option>
+        </select>
         <button
           type="submit"
           disabled={isSubmitting}
@@ -162,10 +195,32 @@ const Batches = () => {
         </button>
       </form>
 
+      {/* Status Filter */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-2">Filter by Status:</label>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border p-2 rounded"
+        >
+          <option value="all">All Statuses</option>
+          <option value="created">Created</option>
+          <option value="tested">Tested</option>
+          <option value="certified">Certified</option>
+          <option value="shipped">Shipped</option>
+        </select>
+        <span className="ml-2 text-sm text-gray-600">
+          Showing {filteredBatches.length} of {batches.length} batches
+        </span>
+      </div>
+
       {/* Display Batches */}
       <div className="space-y-2">
-        {batches.length === 0 && <p>No batches yet.</p>}
-        {batches.map((batch) => (
+        {filteredBatches.length === 0 && batches.length === 0 && <p>No batches yet.</p>}
+        {filteredBatches.length === 0 && batches.length > 0 && (
+          <p>No batches found with status "{statusFilter}".</p>
+        )}
+        {filteredBatches.map((batch) => (
           <div 
             key={batch.id} 
             className="border p-4 rounded-lg hover:shadow-lg transition-shadow cursor-pointer"

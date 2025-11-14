@@ -51,7 +51,16 @@ export const createBatch = async (batchData: {
   quantity: string;
   status?: string;
 }) => {
-  const res = await api.post('/batches/', batchData);
+  // Remove any read-only fields that shouldn't be sent
+  const { blockchain_tx_hash, created_by, owner, created_at, updated_at, ...cleanData } = batchData as any;
+  
+  // Ensure quantity is a string (convert number if needed)
+  const payload = {
+    ...cleanData,
+    quantity: String(cleanData.quantity),
+  };
+  
+  const res = await api.post('/batches/', payload);
   return res.data; // includes blockchain_tx_hash if backend integrated
 };
 
@@ -67,20 +76,58 @@ export const getBatchById = async (id: string) => {
 
 // ---------- LAB TESTS ----------
 export const createLabTest = async (labData: {
-  testId: string;
-  batchId: string;
+  batch: number; // Batch ID (foreign key)
+  test_type: string;
   result: string;
+  tested_by: string;
+  test_date: string; // YYYY-MM-DD format
 }) => {
   const res = await api.post('/labtests/', labData);
   return res.data;
 };
 
+export const getLabTests = async (batchId?: number) => {
+  const url = batchId ? `/labtests/?batch=${batchId}` : '/labtests/';
+  const res = await api.get(url);
+  return res.data;
+};
+
+export const getLabTestById = async (id: string | number) => {
+  const res = await api.get(`/labtests/${id}/`);
+  return res.data;
+};
+
 // ---------- CERTIFICATES ----------
 export const issueCertificate = async (certData: {
-  certId: string;
-  batchId: string;
-  issuer: string;
+  batch: number; // Batch ID (foreign key)
+  certificate_id: string;
+  issued_by: string;
+  issue_date: string; // YYYY-MM-DD format
+  expiry_date: string; // YYYY-MM-DD format
 }) => {
   const res = await api.post('/certificates/', certData);
+  return res.data;
+};
+
+export const getCertificates = async (batchId?: number) => {
+  const url = batchId ? `/certificates/?batch=${batchId}` : '/certificates/';
+  const res = await api.get(url);
+  return res.data;
+};
+
+export const getCertificateById = async (id: string | number) => {
+  const res = await api.get(`/certificates/${id}/`);
+  return res.data;
+};
+
+// ---------- STATISTICS ----------
+export const getStatistics = async () => {
+  const res = await api.get('/batches/statistics/');
+  return res.data;
+};
+
+// ---------- JOURNEY/AUDIT TRAIL ----------
+export const getBatchJourney = async (batchId: string | number) => {
+  const res = await api.get(`/batches/journey/${batchId}/`);
   return res.data;
 };
