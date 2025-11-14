@@ -67,6 +67,11 @@ export const readBatch = async (signerOrProvider, batchId) => {
   try {
     const batch = await contract.getBatch(batchId);
     
+    // Check if batch exists (empty string or zero address means not found)
+    if (!batch || !batch.batchId || batch.batchId === '' || batch.batchId === '0x0000000000000000000000000000000000000000') {
+      return null; // Batch not found
+    }
+    
     return {
       batchId: batch.batchId,
       description: batch.description,
@@ -74,8 +79,12 @@ export const readBatch = async (signerOrProvider, batchId) => {
       createdBy: batch.createdBy,
     };
   } catch (error) {
-    if (error.message && error.message.includes('Batch not found')) {
-      return null;
+    // Handle various error types
+    if (error.code === 'BAD_DATA' || 
+        error.message?.includes('could not decode') ||
+        error.message?.includes('Batch not found') ||
+        error.message?.includes('value="0x"')) {
+      return null; // Batch doesn't exist on blockchain
     }
     throw error;
   }
