@@ -412,7 +412,30 @@ VITE_GITHUB_CLIENT_ID=your-github-client-id
 
 ### Getting OAuth Client IDs
 
-//
+#### Google OAuth Setup
+
+1. **Create Google Cloud Project**: Go to [Google Cloud Console](https://console.cloud.google.com/), create a new project
+2. **Enable Google Identity Services**: In APIs & Services > Library, enable "Google Identity Services"
+3. **Configure OAuth Consent Screen**: Set up external app with app name "AsaliTrace", add scopes: `email`, `profile`, `openid`
+4. **Create OAuth Credentials**: 
+   - Go to APIs & Services > Credentials
+   - Create OAuth 2.0 Client ID (Web application)
+   - Add authorized origins: `http://localhost:5173`
+   - Add redirect URI: `http://localhost:5173/auth/callback`
+5. **Copy Client ID**: Format: `123456789-xxx.apps.googleusercontent.com`
+6. **Add to `.env`**: `VITE_GOOGLE_CLIENT_ID=your_client_id`
+
+#### GitHub OAuth Setup
+
+1. **Create OAuth App**: Go to [GitHub Developer Settings](https://github.com/settings/developers) > OAuth Apps
+2. **Register Application**:
+   - Application name: AsaliTrace
+   - Homepage URL: `http://localhost:5173`
+   - Authorization callback URL: `http://localhost:5173/auth/callback`
+3. **Copy Client ID**: Format: `Iv1.1234567890abcdef`
+4. **Add to `.env`**: `VITE_GITHUB_CLIENT_ID=your_client_id`
+
+**Note**: Client Secrets should be stored in backend `.env` only, never in frontend.
 
 ---
 
@@ -636,7 +659,73 @@ docker-compose down
 
 ### Manual Deployment
 
-//
+#### Docker Deployment (Recommended)
+
+1. **Build and start services**:
+   ```bash
+   docker-compose build
+   docker-compose up -d
+   ```
+
+2. **Run migrations**:
+   ```bash
+   docker-compose exec backend python manage.py migrate
+   docker-compose exec backend python manage.py createsuperuser
+   ```
+
+3. **Collect static files**:
+   ```bash
+   docker-compose exec backend python manage.py collectstatic --noinput
+   ```
+
+#### Traditional Server Deployment
+
+1. **Server Setup** (Ubuntu/Debian):
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install python3.11 python3-pip python3-venv nodejs npm postgresql nginx -y
+   ```
+
+2. **Database Setup**:
+   ```bash
+   sudo -u postgres createdb asalitrace_db
+   sudo -u postgres createuser asalitrace_user
+   sudo -u postgres psql -c "ALTER USER asalitrace_user WITH PASSWORD 'your-password';"
+   ```
+
+3. **Backend Deployment**:
+   ```bash
+   cd /var/www/AsaliTrace/backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt gunicorn
+   python manage.py migrate
+   python manage.py collectstatic --noinput
+   ```
+
+4. **Frontend Build**:
+   ```bash
+   cd /var/www/AsaliTrace/frontend
+   npm install
+   npm run build
+   ```
+
+5. **Nginx Configuration**: Configure Nginx to serve frontend and proxy API requests to Gunicorn
+
+6. **SSL Setup**: Use Let's Encrypt for HTTPS certificates
+
+#### Cloud Platform Deployment
+
+- **AWS**: Use Elastic Beanstalk for backend, S3+CloudFront for frontend
+- **Heroku**: Use Heroku Postgres, deploy backend with Procfile, frontend on Netlify/Vercel
+- **DigitalOcean**: Use App Platform or traditional VPS with Docker
+
+#### Blockchain Deployment
+
+1. **Local Development**: Use Hardhat local node (`npx hardhat node`)
+2. **Testnet**: Deploy to Sepolia/Goerli testnet
+3. **Mainnet**: Deploy to Ethereum mainnet (requires real ETH, test thoroughly first)
+4. **Node Options**: Use managed services (Infura, Alchemy) or self-hosted node
 
 ### Environment-Specific Settings
 
