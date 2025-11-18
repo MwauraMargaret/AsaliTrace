@@ -46,11 +46,11 @@ DATABASES = {
 }
 
 # Static files configuration
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATIC_URL = '/static/'
 
 # Media files configuration
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
 
 # CORS configuration - only allow production frontend
@@ -79,7 +79,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'filename': str(BASE_DIR / 'logs' / 'django.log'),
             'formatter': 'verbose',
         },
         'console': {
@@ -107,7 +107,7 @@ LOGGING = {
 }
 
 # Create logs directory if it doesn't exist
-os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
+os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 # Email configuration (for 2FA and notifications)
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')

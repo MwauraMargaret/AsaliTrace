@@ -1,0 +1,69 @@
+version: "3.10"
+
+services:
+  db:
+    image: postgres:15
+    container_name: asalitrace_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-asalitrace}
+      POSTGRES_USER: ${POSTGRES_USER:-asalitrace_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asalipass123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB:-asalitrace} -U ${POSTGRES_USER:-asalitrace_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: asalitrace_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      DB_NAME: ${POSTGRES_DB:-asalitrace}
+      DB_USER: ${POSTGRES_USER:-asalitrace_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-asalipass123}
+      DB_HOST: db
+      DB_PORT: 5432
+      BLOCKCHAIN_RPC_URL: http://host.docker.internal:8545
+      PRIVATE_KEY: ${PRIVATE_KEY}
+      PUBLIC_ADDRESS: ${PUBLIC_ADDRESS}
+      CONTRACT_ADDRESS: ${CONTRACT_ADDRESS}
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_DJANGO_API_URL: ${VITE_DJANGO_API_URL:-/api}
+    container_name: asalitrace_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "3000:80"
+    volumes:
+      - static_data:/staticfiles:ro
+      - media_data:/media:ro
+
+volumes:
+  postgres_data:
+  static_data:
+  media_data:
+

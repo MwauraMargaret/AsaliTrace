@@ -2,16 +2,27 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def get_list_setting(setting_name: str, default: list[str]) -> list[str]:
+    raw_value = os.environ.get(setting_name)
+    if not raw_value:
+        return default
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+# SECURITY
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret")
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
+ALLOWED_HOSTS = get_list_setting(
+    "DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"]
+)
 
-DEBUG = True
-
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-
+# URLs & Templates
 ROOT_URLCONF = "asalitrace.urls"
 
 TEMPLATES = [
@@ -30,6 +41,7 @@ TEMPLATES = [
     },
 ]
 
+# Installed apps
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,6 +65,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.apple',
     'allauth_2fa',
+    'two_factor',
     'django_otp',
     'django_otp.plugins.otp_totp',
     'django_otp.plugins.otp_email',
@@ -65,6 +78,7 @@ INSTALLED_APPS = [
 
 SITE_ID = 1
 
+# Middleware
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -78,14 +92,38 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware'
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
+# CORS
+CORS_ALLOWED_ORIGINS = get_list_setting(
+    "CORS_ALLOWED_ORIGINS",
+    [
+    
+        "http://localhost:3000",  
+        "http://127.0.0.1:3000", 
+    ],
+)
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
+# Database (PostgreSQL)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "asalitrace_db"),
+        "USER": os.environ.get("DB_USER", "asalitrace_user"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "change_me"),
+        "HOST": os.environ.get("DB_HOST", "db"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
@@ -99,8 +137,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-# JWT Settings
-from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -108,34 +144,12 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Only allow specific origins in production
-
-# CORS headers
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
 # Allauth config
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
 )
 
-# Allauth configuration
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
@@ -144,11 +158,8 @@ ACCOUNT_ADAPTER = 'allauth_2fa.adapter.OTPAdapter'
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
 
-
-# dj-rest-auth setting to use JWT tokens
 REST_USE_JWT = True
 
-# Social provider client IDs/secrets set via environment variables
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         'SCOPE': ['profile', 'email'],
@@ -167,7 +178,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": ""
         }
     },
-     'apple': {
+    "apple": {
         'APP': {
             'client_id': 'your-apple-client-id',
             'secret': 'your-apple-client-secret',
@@ -181,5 +192,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Static files
 STATIC_URL = "/static/"
-
+STATIC_ROOT = BASE_DIR / "staticfiles"  # Required for collectstatic
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
