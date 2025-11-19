@@ -51,7 +51,7 @@ def check_abi_file():
     print("-" * 60)
     
     from django.conf import settings
-    ABI_PATH = os.path.join(settings.BASE_DIR, "../frontend/src/artifacts/contracts/AsaliTrace.sol/AsaliTrace.json")
+    ABI_PATH = os.path.join(settings.BASE_DIR, "frontend_artifacts/contracts/AsaliTrace.sol/AsaliTrace.json")
     
     if os.path.exists(ABI_PATH):
         print(f"  ✓ ABI file found: {ABI_PATH}")

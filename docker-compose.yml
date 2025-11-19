@@ -43,6 +43,7 @@ services:
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
+      - ./frontend/src/artifacts:/app/frontend_artifacts:ro
     ports:
       - "8000:8000"
 

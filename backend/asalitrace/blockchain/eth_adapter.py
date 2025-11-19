@@ -76,7 +76,9 @@ def get_contract():
         
         try:
             # Load ABI
-            ABI_PATH = os.path.join(settings.BASE_DIR, "../frontend/src/artifacts/contracts/AsaliTrace.sol/AsaliTrace.json")
+            ABI_PATH = os.path.join(settings.BASE_DIR, "frontend_artifacts/contracts/AsaliTrace.sol/AsaliTrace.json")
+            print(f"Resolved ABI path: {ABI_PATH}")
+            print(f"Resolved ABI path: {ABI_PATH}")
             if not os.path.exists(ABI_PATH):
                 raise FileNotFoundError(f"Contract ABI not found at {ABI_PATH}")
             
