@@ -12,6 +12,7 @@ from .settings import *  # Import base settings
 
 # Override base settings for production
 DEBUG = False
+DJANGO_SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # Security settings
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
@@ -54,10 +55,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
 
 # CORS configuration - only allow production frontend
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-if not CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS == ['']:
-    CORS_ALLOWED_ORIGINS = []
-
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+CORS_ALLOWED_ORIGINS = [frontend_url]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 
@@ -105,9 +104,29 @@ LOGGING = {
         },
     },
 }
-
-# Create logs directory if it doesn't exist
-os.makedirs(BASE_DIR / 'logs', exist_ok=True)
+# Ensure logs directory exists and is writable
+logs_dir = BASE_DIR / 'logs'
+if not logs_dir.exists():
+    try:
+        os.makedirs(logs_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create logs directory: {e}")
+# Blockchain configuration
+# Ensure these are set in your .env file and never committed to git
+# BLOCKCHAIN_RPC_URL=https://your-ethereum-node.com
+# CONTRACT_ADDRESS=0x...
+# PRIVATE_KEY=0x... (use secret manager in production)
+# PUBLIC_ADDRESS=0x...
+# Monitoring & Backup (manual steps)
+# - Integrate Sentry for error monitoring: https://sentry.io/welcome/
+# - Set up Uptime Robot or similar for uptime monitoring
+# - Automate PostgreSQL backups (see DEPLOYMENT_GUIDE.md)
+# Example backup command:
+# pg_dump -U asalitrace_user -h localhost asalitrace_db > backup_$(date +%Y%m%d).sql
+# SSL/HTTPS
+# - Use Nginx as a reverse proxy and enable SSL (see DEPLOYMENT_GUIDE.md)
+# - Use Let's Encrypt for free certificates
+# - Update Nginx config to redirect HTTP to HTTPS
 
 # Email configuration (for 2FA and notifications)
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
