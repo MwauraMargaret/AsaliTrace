@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class BatchViewSet(viewsets.ModelViewSet):
     queryset = Batch.objects.all()
     serializer_class = BatchSerializer
-    permission_classes = [IsAuthenticated]  # Require authentication
+    permission_classes = [AllowAny]  
 
     def get_queryset(self):
         """Filter batches based on user permissions."""
@@ -748,7 +748,7 @@ class LabTestViewSet(viewsets.ModelViewSet):
 class CertificateViewSet(viewsets.ModelViewSet):
     queryset = Certificate.objects.all()
     serializer_class = CertificateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter certificates based on user permissions."""
