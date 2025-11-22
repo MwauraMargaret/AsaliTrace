@@ -100,7 +100,6 @@ const HoneyBatch = () => {
 
   const trustFactors = [
     "Blockchain records confirmed across all checkpoints",
-    "AI purity analysis shows 98% pure wildflower honey",
     "Beekeeper identity verified and certified",
     "No gaps in supply chain tracking",
     "Laboratory test results match on-chain data"

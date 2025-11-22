@@ -27,11 +27,11 @@ const Index = () => {
       title: "Full Journey Tracking",
       description: "Follow honey's path from hive to harvest to your home with interactive maps"
     },
-    {
-      icon: <TrendingUp className="w-8 h-8 text-primary" />,
-      title: "Trust Score",
+    //{
+    //  icon: <TrendingUp className="w-8 h-8 text-primary" />,
+    //  title: "Trust Score",
      // description: "AI-powered confidence ratings with friendly explanations you can understand"
-    }
+   // }
   ];
 
   return (
@@ -53,9 +53,11 @@ const Index = () => {
               <a href="#features" className="text-sm font-medium hover:text-primary transition-colors">
                 Features
               </a>
-              <a href="#beekeepers" className="text-sm font-medium hover:text-primary transition-colors">
-                For Beekeepers
-              </a>
+              <button 
+                onClick={() => navigate('/journey')} 
+                className="text-sm font-medium hover:text-primary transition-colors">
+                Your Honey Journey
+              </button>
             </div>
             {user ? (
               <Button variant="honey" onClick={() => navigate('/account')}>
@@ -85,7 +87,7 @@ const Index = () => {
               Sweet Technology with a <span className="text-primary">Human Touch</span>
             </h2>
             <p className="text-xl text-muted-foreground">
-              We combine cutting-edge blockchain and AI to make honey traceability 
+              We use cutting-edge blockchain technology on Ethereum network to make honey traceability 
               simple, transparent, and emotionally reassuring.
             </p>
           </div>
@@ -120,8 +122,8 @@ const Index = () => {
                 Experience a Real Honey Journey
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Explore a sample batch of Vermont Wildflower Honey and see how 
-                blockchain and AI work together to verify authenticity.
+                Explore a sample batch of Kenyan Honey and see how 
+                blockchain technology works to verify authenticity.
               </p>
               <Button 
                 size="lg" 

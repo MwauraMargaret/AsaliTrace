@@ -8,6 +8,7 @@ import { Web3Provider } from "@/contexts/Web3Context";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import HoneyBatch from "./pages/HoneyBatch";
+import YourJourney from "./pages/YourJourney";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/batch/:id" element={<HoneyBatch />} />
+              <Route path="/journey" element={<YourJourney />} />
               <Route 
                 path="/account" 
                 element={
