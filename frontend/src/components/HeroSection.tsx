@@ -84,7 +84,7 @@ const HeroSection = () => {
             
             <p className="text-xl text-muted-foreground max-w-xl">
               AsaliTrace uses blockchain technology to reveal the authentic journey 
-              of your honey—from the hive to your home. Trust the trace. Taste the truth.
+              of your honey from the hive to your shelf. Trust the trace. Taste the truth.
             </p>
 
             <div className="flex flex-wrap gap-4">

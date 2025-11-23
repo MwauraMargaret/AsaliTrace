@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, XCircle, Flag, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,21 @@ import JourneyMap from "@/components/JourneyMap";
 //import AIQualityAnalyzer from "@/components/AIQualityAnalyzer";
 //import BeekeeperProfile from "@/components/BeekeeperProfile";
 //import TrustScore from "@/components/TrustScore";
-import { getBatchById, getBatches, createLabTest, getLabTests, issueCertificate, getCertificates } from "@/services/api";
+import { 
+  getBatchById, 
+  getBatches, 
+  createLabTest, 
+  getLabTests, 
+  issueCertificate, 
+  getCertificates,
+  flagLabTest,
+  flagCertificate,
+  verifyCertificate,
+  recordLabTestOnChain,
+  recordCertificateOnChain
+} from "@/services/api";
 import { useBlockchain } from "@/hooks/useBlockchain";
+import { useAuth } from "@/contexts/AuthContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { toast } from "sonner";
 import api from "@/services/api";
@@ -27,6 +40,8 @@ interface Batch {
   blockchain_tx_hash?: string | null;
   created_at?: string;
   updated_at?: string;
+  created_by_email?: string;
+  owner_email?: string;
 }
 
 interface BlockchainBatchData {
@@ -44,6 +59,9 @@ interface LabTest {
   tested_by: string;
   test_date: string;
   blockchain_tx_hash?: string | null;
+  is_flagged?: boolean;
+  flagged_by?: string;
+  flag_reason?: string;
 }
 
 interface Certificate {
@@ -54,11 +72,30 @@ interface Certificate {
   issue_date: string;
   expiry_date: string;
   blockchain_tx_hash?: string | null;
+  is_verified?: boolean;
+  verified_by?: string;
+  is_flagged?: boolean;
+  flagged_by?: string;
+  flag_reason?: string;
 }
 
-const HoneyBatch = () => {
-  const { id } = useParams<{ id: string }>();
+interface FlaggedItem {
+  type: 'lab_test' | 'certificate';
+  id: number;
+  reason: string;
+  flaggedBy: string;
+}
+
+interface HoneyBatchProps {
+  adminView?: boolean;
+}
+
+const HoneyBatch = ({ adminView = false }: HoneyBatchProps) => {
+  const { user } = useAuth();
+  const isAdmin = adminView && (user?.is_superuser || user?.is_staff);
+  const { id } = useParams();
   const navigate = useNavigate();
+
   const [batch, setBatch] = useState<Batch | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +123,8 @@ const HoneyBatch = () => {
     issue_date: new Date().toISOString().split('T')[0],
     expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 year from now
   });
+  const [flaggedItems, setFlaggedItems] = useState<FlaggedItem[]>([]);
+  
   const { verifyBatch } = useBlockchain();
   const { 
     isConnected, 
@@ -97,6 +136,15 @@ const HoneyBatch = () => {
     connectToHardhat,
     checkHardhatConnection 
   } = useWeb3();
+
+
+  // User-level batch status choices for creation
+  const batchStatusChoices = [
+    { value: 'created', label: 'Created' },
+    { value: 'harvested', label: 'Harvested' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'packaged', label: 'Packaged' },
+  ];
 
   const trustFactors = [
     "Blockchain records confirmed across all checkpoints",
@@ -113,6 +161,35 @@ const HoneyBatch = () => {
     if (id) fetchBatch(id);
   }, [id]);
 
+  // Update flagged items when lab tests or certificates change
+  useEffect(() => {
+    const newFlaggedItems: FlaggedItem[] = [];
+    
+    labTests.forEach(test => {
+      if (test.is_flagged && test.id) {
+        newFlaggedItems.push({
+          type: 'lab_test',
+          id: test.id,
+          reason: test.flag_reason || 'Suspicious activity detected',
+          flaggedBy: test.flagged_by || 'Admin'
+        });
+      }
+    });
+    
+    certificates.forEach(cert => {
+      if (cert.is_flagged && cert.id) {
+        newFlaggedItems.push({
+          type: 'certificate',
+          id: cert.id,
+          reason: cert.flag_reason || 'Suspicious activity detected',
+          flaggedBy: cert.flagged_by || 'Admin'
+        });
+      }
+    });
+    
+    setFlaggedItems(newFlaggedItems);
+  }, [labTests, certificates]);
+
   const fetchBatches = async () => {
     try {
       const data = await getBatches();
@@ -126,7 +203,6 @@ const HoneyBatch = () => {
     try {
       setLoading(true);
       setError(null);
-
       let data;
       try {
         data = await getBatchById(batchId);
@@ -135,10 +211,8 @@ const HoneyBatch = () => {
         data = all.find((b: Batch) => b.batch_id === batchId || b.id?.toString() === batchId);
         if (!data) throw new Error("Batch not found");
       }
-
       setBatch(data);
       if (data.blockchain_tx_hash && isConnected) verifyOnBlockchain(data.batch_id);
-      
       // Fetch lab tests and certificates for this batch
       if (data.id) {
         try {
@@ -161,7 +235,158 @@ const HoneyBatch = () => {
     }
   };
 
+  // Admin action: Flag suspicious lab test
+  const handleFlagLabTest = async (testId: number) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can flag suspicious activity');
+      return;
+    }
+
+    const reason = prompt('Please provide a reason for flagging this lab test:');
+    if (!reason) return;
+
+    try {
+      await flagLabTest(testId, reason, user?.email || 'Admin');
+      toast.error('Lab test flagged as suspicious', {
+        description: `Admin Action by: ${user?.email}`
+      });
+      
+      // Update local state
+      setLabTests(prev => prev.map(test => 
+        test.id === testId 
+          ? { 
+              ...test, 
+              is_flagged: true, 
+              flagged_by: user?.email,
+              flag_reason: reason 
+            }
+          : test
+      ));
+      
+      // Refresh batch data
+      if (batch) await fetchBatch(batch.batch_id);
+    } catch (err: any) {
+      console.error('Error flagging lab test:', err);
+      toast.error(err?.response?.data?.message || 'Failed to flag lab test');
+    }
+  };
+
+  // Admin action: Flag suspicious certificate
+  const handleFlagCertificate = async (certId: number) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can flag suspicious activity');
+      return;
+    }
+
+    const reason = prompt('Please provide a reason for flagging this certificate:');
+    if (!reason) return;
+
+    try {
+      await flagCertificate(certId, reason, user?.email || 'Admin');
+      toast.error('Certificate flagged as suspicious', {
+        description: `Admin Action by: ${user?.email}`
+      });
+      
+      // Update local state
+      setCertificates(prev => prev.map(cert => 
+        cert.id === certId 
+          ? { 
+              ...cert, 
+              is_flagged: true, 
+              flagged_by: user?.email,
+              flag_reason: reason 
+            }
+          : cert
+      ));
+      
+      // Refresh batch data
+      if (batch) await fetchBatch(batch.batch_id);
+    } catch (err: any) {
+      console.error('Error flagging certificate:', err);
+      toast.error(err?.response?.data?.message || 'Failed to flag certificate');
+    }
+  };
+
+  // Admin action: Verify certificate
+  const handleVerifyCertificate = async (certId: number) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can verify certificates');
+      return;
+    }
+
+    try {
+      await verifyCertificate(certId, user?.email || 'Admin');
+      toast.success('Certificate verified successfully', {
+        description: `Admin Action by: ${user?.email}`
+      });
+      
+      // Update local state
+      setCertificates(prev => prev.map(cert => 
+        cert.id === certId 
+          ? { 
+              ...cert, 
+              is_verified: true, 
+              verified_by: user?.email 
+            }
+          : cert
+      ));
+      
+      // Refresh batch data
+      if (batch) await fetchBatch(batch.batch_id);
+    } catch (err: any) {
+      console.error('Error verifying certificate:', err);
+      toast.error(err?.response?.data?.message || 'Failed to verify certificate');
+    }
+  };
+
+  // Admin action: Record lab test on blockchain
+  const handleRecordLabTestOnChain = async (testId: number) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can record lab tests on blockchain');
+      return;
+    }
+
+    try {
+      const response = await recordLabTestOnChain(testId);
+      toast.success('Lab test recorded on blockchain!', {
+        description: `Admin Action by: ${user?.email}`
+      });
+      
+      // Refresh batch data
+      if (batch) await fetchBatch(batch.batch_id);
+    } catch (err: any) {
+      console.error('Error recording lab test on chain:', err);
+      toast.error(err?.response?.data?.message || 'Failed to record lab test on blockchain');
+    }
+  };
+
+  // Admin action: Record certificate on blockchain
+  const handleRecordCertificateOnChain = async (certId: number) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can record certificates on blockchain');
+      return;
+    }
+
+    try {
+      const response = await recordCertificateOnChain(certId);
+      toast.success('Certificate recorded on blockchain!', {
+        description: `Admin Action by: ${user?.email}`
+      });
+      
+      // Refresh batch data
+      if (batch) await fetchBatch(batch.batch_id);
+    } catch (err: any) {
+      console.error('Error recording certificate on chain:', err);
+      toast.error(err?.response?.data?.message || 'Failed to record certificate on blockchain');
+    }
+  };
+
   const verifyOnBlockchain = async (batchId: string) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can verify on blockchain');
+      return;
+    }
+
     try {
       setVerifying(true);
       
@@ -181,28 +406,9 @@ const HoneyBatch = () => {
             timestamp: response.data.data.timestamp.toString(),
             createdBy: response.data.data.createdBy,
           });
-          toast.success('Batch verified on blockchain!');
-          return;
-        } else {
-          // Show detailed error message from backend
-          const errorData = response.data;
-          let errorMessage = errorData.message || 'Batch not found on blockchain.';
-          
-          if (errorData.tx_status === 0) {
-            errorMessage = `Transaction failed. ${errorData.message}`;
-            if (errorData.suggestion) {
-              errorMessage += ` ${errorData.suggestion}`;
-            }
-            toast.error(errorMessage, { duration: 8000 });
-          } else if (errorData.tx_status === 1) {
-            errorMessage = `Transaction succeeded but batch not found. ${errorData.message}`;
-            if (errorData.suggestion) {
-              errorMessage += ` ${errorData.suggestion}`;
-            }
-            toast.warning(errorMessage, { duration: 8000 });
-          } else {
-            toast.warning(errorMessage, { duration: 6000 });
-          }
+          toast.success('Batch verified on blockchain!', {
+            description: `Admin Action by: ${user?.email}`
+          });
           return;
         }
       } catch (apiErr: any) {
@@ -212,7 +418,9 @@ const HoneyBatch = () => {
             const data = await verifyBatch(batchId) as BlockchainBatchData | null;
             if (data) {
               setBlockchainData(data);
-              toast.success('Batch verified on blockchain!');
+              toast.success('Batch verified on blockchain!', {
+                description: `Admin Action by: ${user?.email}`
+              });
               return;
             } else {
               toast.warning('Batch not found on blockchain. It may not have been recorded yet.');
@@ -335,7 +543,7 @@ const HoneyBatch = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-card to-muted">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
@@ -353,8 +561,14 @@ const HoneyBatch = () => {
                 </p>
               </div>
             </div>
-
-            <Button variant="honey">Purchase This Batch</Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/batches")}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Batches
+            </Button>
           </div>
 
           {/* Dropdown to select other batches */}
@@ -372,6 +586,24 @@ const HoneyBatch = () => {
                 </option>
               ))}
             </select>
+            {/* Batch status dropdown (admin only, only in adminView) */}
+            {isAdmin && batch && (
+              <>
+                <span className="ml-4 text-sm text-muted-foreground">Status:</span>
+                <select
+                  value={batch.status}
+                  onChange={e => {
+                    // TODO: Implement status update API call here
+                    setBatch({ ...batch, status: e.target.value });
+                  }}
+                  className="border border-border rounded-lg px-2 py-1 bg-card text-sm"
+                >
+                  {batchStatusChoices.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -380,7 +612,7 @@ const HoneyBatch = () => {
       <main className="container mx-auto px-4 py-10 grid lg:grid-cols-3 gap-8">
         {/* Left section */}
         <div className="lg:col-span-2 space-y-8">
-          <JourneyMap />
+          <JourneyMap flaggedItems={flaggedItems} suspiciousSteps={labTests.filter(t => t.is_flagged).length + certificates.filter(c => c.is_flagged).length} />
           
           {/* Lab Tests Section */}
           <Card>
@@ -390,7 +622,7 @@ const HoneyBatch = () => {
                   <CardTitle>Lab Tests</CardTitle>
                   <CardDescription>Quality test results for this batch</CardDescription>
                 </div>
-                {batch && (
+                {batch && (isAdmin || (!adminView && user && (batch.created_by_email === user.email || batch.owner_email === user.email))) && (
                   <Button
                     onClick={() => setShowLabTestForm(!showLabTestForm)}
                     size="sm"
@@ -402,8 +634,8 @@ const HoneyBatch = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Lab Test Form */}
-              {showLabTestForm && batch && (
+              {/* Lab Test Form - Admin or batch owner */}
+              {showLabTestForm && batch && (isAdmin || (!adminView && user && (batch.created_by_email === user.email || batch.owner_email === user.email))) && (
                 <Card className="bg-muted/50">
                   <CardContent className="pt-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -450,19 +682,38 @@ const HoneyBatch = () => {
                     <Button
                       onClick={async () => {
                         if (!batch?.id) return;
+                        // Only admins or batch owners can create lab tests
+                        const isOwner = user && (batch.created_by_email === user.email || batch.owner_email === user.email);
+                        if (!isAdmin && !isOwner) {
+                          toast.error('Only the batch owner or an admin can create lab tests.');
+                          return;
+                        }
+                        // Ensure test_date is always YYYY-MM-DD
+                        let formattedDate = labTestForm.test_date;
+                        // If not already in YYYY-MM-DD, convert
+                        if (/\d{2}-\d{2}-\d{4}/.test(formattedDate)) {
+                          // MM-DD-YYYY to YYYY-MM-DD
+                          const [mm, dd, yyyy] = formattedDate.split('-');
+                          formattedDate = `${yyyy}-${mm}-${dd}`;
+                        }
+                        const payload = {
+                          batch: batch.id,
+                          test_type: labTestForm.test_type,
+                          result: labTestForm.result,
+                          tested_by: labTestForm.tested_by,
+                          test_date: formattedDate,
+                        };
+                        console.log('LabTest payload:', payload);
                         setCreatingLabTest(true);
                         try {
-                          const newTest = await createLabTest({
-                            batch: batch.id,
-                            test_type: labTestForm.test_type,
-                            result: labTestForm.result,
-                            tested_by: labTestForm.tested_by,
-                            test_date: labTestForm.test_date,
-                          });
+                          const newTest = await createLabTest(payload);
                           toast.success(
                             newTest.blockchain_tx_hash
                               ? 'Lab test created and recorded on blockchain!'
-                              : 'Lab test created (blockchain recording pending)'
+                              : 'Lab test created (blockchain recording pending)',
+                            {
+                              description: `${isAdmin ? 'Admin Action by: ' : 'Submitted by: '}${user?.email}`
+                            }
                           );
                           setLabTests([...labTests, newTest]);
                           setShowLabTestForm(false);
@@ -476,7 +727,7 @@ const HoneyBatch = () => {
                           await fetchBatch(batch.batch_id);
                         } catch (err: any) {
                           console.error('Error creating lab test:', err);
-                          toast.error(err?.response?.data?.message || 'Failed to create lab test');
+                          toast.error(err?.response?.data?.message || err?.message || 'Failed to create lab test. Please check your permissions and try again.');
                         } finally {
                           setCreatingLabTest(false);
                         }
@@ -502,13 +753,16 @@ const HoneyBatch = () => {
               {labTests.length === 0 ? (
                 <Alert>
                   <AlertDescription>
-                    No lab tests recorded yet. Add a lab test to verify quality.
+                    {isAdmin 
+                      ? "No lab tests recorded yet. Add a lab test to verify quality."
+                      : "No lab tests recorded yet. Review in progress."
+                    }
                   </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-3">
                   {labTests.map((test) => (
-                    <Card key={test.id} className="bg-card">
+                    <Card key={test.id} className={`bg-card ${test.is_flagged ? 'border-red-500 border-2' : ''}`}>
                       <CardContent className="pt-6">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -518,6 +772,12 @@ const HoneyBatch = () => {
                                 <Badge className="bg-green-500">
                                   <CheckCircle2 className="w-3 h-3 mr-1" />
                                   Verified
+                                </Badge>
+                              )}
+                              {test.is_flagged && (
+                                <Badge variant="destructive">
+                                  <Flag className="w-3 h-3 mr-1" />
+                                  Flagged
                                 </Badge>
                               )}
                             </div>
@@ -533,24 +793,44 @@ const HoneyBatch = () => {
                                 TX: {test.blockchain_tx_hash.substring(0, 20)}...
                               </p>
                             )}
+                            {test.is_flagged && (
+                              <Alert variant="destructive" className="mt-2">
+                                <AlertDescription className="text-xs">
+                                  <strong>Flagged by: {test.flagged_by}</strong><br />
+                                  Reason: {test.flag_reason}
+                                </AlertDescription>
+                              </Alert>
+                            )}
                           </div>
-                          {!test.blockchain_tx_hash && batch && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                try {
-                                  const response = await api.post(`/labtests/${test.id}/record-on-chain/`);
-                                  toast.success('Lab test recorded on blockchain!');
-                                  await fetchBatch(batch.batch_id);
-                                } catch (err: any) {
-                                  toast.error(err?.response?.data?.message || 'Failed to record on blockchain');
-                                }
-                              }}
-                            >
-                              Record on Chain
-                            </Button>
-                          )}
+                          <div className="flex flex-col gap-2 ml-4">
+                            {/* Admin-only controls for lab tests, only in adminView */}
+                            {isAdmin && !test.blockchain_tx_hash && batch && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRecordLabTestOnChain(test.id!)}
+                                disabled={test.is_flagged}
+                              >
+                                Record on Chain
+                              </Button>
+                            )}
+                            {isAdmin && !test.is_flagged && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleFlagLabTest(test.id!)}
+                                className="text-red-600 border-red-600 hover:bg-red-50"
+                              >
+                                <Flag className="w-3 h-3 mr-1" />
+                                Flag
+                              </Button>
+                            )}
+                            {!isAdmin && !test.blockchain_tx_hash && (
+                              <Badge variant="secondary" className="self-start">
+                                Under Review
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -568,20 +848,20 @@ const HoneyBatch = () => {
                   <CardTitle>Certificates</CardTitle>
                   <CardDescription>Quality certificates for this batch</CardDescription>
                 </div>
-                {batch && (
+                {batch && (isAdmin || (!adminView && user && (batch.created_by_email === user.email || batch.owner_email === user.email))) && (
                   <Button
                     onClick={() => setShowCertificateForm(!showCertificateForm)}
                     size="sm"
                     variant="outline"
                   >
-                    {showCertificateForm ? 'Cancel' : '+ Issue Certificate'}
+                    {showCertificateForm ? 'Cancel' : '+Provide Certification'}
                   </Button>
                 )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Certificate Form */}
-              {showCertificateForm && batch && (
+              {/* Certificate Form - Admin or batch owner */}
+              {showCertificateForm && batch && (isAdmin || (!adminView && user && (batch.created_by_email === user.email || batch.owner_email === user.email))) && (
                 <Card className="bg-muted/50">
                   <CardContent className="pt-6 space-y-4">
                     <div>
@@ -639,7 +919,10 @@ const HoneyBatch = () => {
                           toast.success(
                             newCert.blockchain_tx_hash
                               ? 'Certificate issued and recorded on blockchain!'
-                              : 'Certificate issued (blockchain recording pending)'
+                              : 'Certificate issued (blockchain recording pending)',
+                            {
+                              description: `${isAdmin ? 'Admin Action by: ' : 'Submitted by: '}${user?.email}`
+                            }
                           );
                           setCertificates([...certificates, newCert]);
                           setShowCertificateForm(false);
@@ -679,13 +962,16 @@ const HoneyBatch = () => {
               {certificates.length === 0 ? (
                 <Alert>
                   <AlertDescription>
-                    No certificates issued yet. Issue a certificate to verify authenticity.
+                    {isAdmin
+                      ? "No certificates issued yet. Issue a certificate to verify authenticity."
+                      : "No certificates issued yet. Review in progress."
+                    }
                   </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-3">
                   {certificates.map((cert) => (
-                    <Card key={cert.id} className="bg-card">
+                    <Card key={cert.id} className={`bg-card ${cert.is_flagged ? 'border-red-500 border-2' : ''}`}>
                       <CardContent className="pt-6">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -695,6 +981,18 @@ const HoneyBatch = () => {
                                 <Badge className="bg-green-500">
                                   <CheckCircle2 className="w-3 h-3 mr-1" />
                                   Verified
+                                </Badge>
+                              )}
+                              {cert.is_verified && (
+                                <Badge className="bg-blue-500">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Certified
+                                </Badge>
+                              )}
+                              {cert.is_flagged && (
+                                <Badge variant="destructive">
+                                  <Flag className="w-3 h-3 mr-1" />
+                                  Flagged
                                 </Badge>
                               )}
                             </div>
@@ -712,24 +1010,62 @@ const HoneyBatch = () => {
                                 TX: {cert.blockchain_tx_hash.substring(0, 20)}...
                               </p>
                             )}
+                            {cert.is_flagged && (
+                              <Alert variant="destructive" className="mt-2">
+                                <AlertDescription className="text-xs">
+                                  <strong>Flagged by: {cert.flagged_by}</strong><br />
+                                  Reason: {cert.flag_reason}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                            {cert.is_verified && (
+                              <Alert className="mt-2 border-green-500 bg-green-50">
+                                <AlertDescription className="text-xs text-green-700">
+                                  <strong>Verified by: {cert.verified_by}</strong>
+                                </AlertDescription>
+                              </Alert>
+                            )}
                           </div>
-                          {!cert.blockchain_tx_hash && batch && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                try {
-                                  const response = await api.post(`/certificates/${cert.id}/record-on-chain/`);
-                                  toast.success('Certificate recorded on blockchain!');
-                                  await fetchBatch(batch.batch_id);
-                                } catch (err: any) {
-                                  toast.error(err?.response?.data?.message || 'Failed to record on blockchain');
-                                }
-                              }}
-                            >
-                              Record on Chain
-                            </Button>
-                          )}
+                          <div className="flex flex-col gap-2 ml-4">
+                            {/* Admin-only controls for certificates, only in adminView */}
+                            {isAdmin && !cert.blockchain_tx_hash && batch && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRecordCertificateOnChain(cert.id!)}
+                                disabled={cert.is_flagged}
+                              >
+                                Record on Chain
+                              </Button>
+                            )}
+                            {isAdmin && !cert.is_verified && !cert.is_flagged && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleVerifyCertificate(cert.id!)}
+                                className="text-green-600 border-green-600 hover:bg-green-50"
+                              >
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Verify
+                              </Button>
+                            )}
+                            {isAdmin && !cert.is_flagged && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleFlagCertificate(cert.id!)}
+                                className="text-red-600 border-red-600 hover:bg-red-50"
+                              >
+                                <Flag className="w-3 h-3 mr-1" />
+                                Flag
+                              </Button>
+                            )}
+                            {!isAdmin && (!cert.blockchain_tx_hash || !cert.is_verified) && (
+                              <Badge variant="secondary" className="self-start">
+                                Under Review
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -828,11 +1164,15 @@ const HoneyBatch = () => {
                       <AlertDescription>
                         Verified at{" "}
                         {new Date(parseInt(blockchainData.timestamp) * 1000).toLocaleString()}
+                        {isAdmin && (
+                          <><br /><strong>Admin Action by: {user?.email}</strong></>
+                        )}
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  {!blockchainData && !verifying && (
+                  {/* Admin-only blockchain verify button, only in adminView */}
+                  {!blockchainData && !verifying && isAdmin && (
                     <Button
                       onClick={() => verifyOnBlockchain(batch.batch_id)}
                       size="sm"
@@ -849,6 +1189,12 @@ const HoneyBatch = () => {
                       <span className="text-sm">Verifying...</span>
                     </div>
                   )}
+
+                  {!isAdmin && !blockchainData && (
+                    <Badge variant="secondary" className="w-full justify-center mt-2">
+                      Verification Under Review
+                    </Badge>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -859,7 +1205,8 @@ const HoneyBatch = () => {
                     </AlertDescription>
                   </Alert>
                   
-                  {batch && (
+                  {/* Admin-only blockchain record button, only in adminView */}
+                  {batch && isAdmin && (
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">
                         You can record this batch on the blockchain to ensure immutability and traceability.
@@ -870,78 +1217,44 @@ const HoneyBatch = () => {
                           setRecording(true);
                           setError(null);
                           try {
-                            console.log('Recording batch on blockchain:', batch.batch_id);
-                            console.log('Batch object:', batch);
-                            
-                            // Ensure we have the numeric ID (primary key) for the API endpoint
-                            // The DRF ViewSet expects the database primary key, not batch_id
-                            const batchPk = batch.id;
-                            if (!batchPk) {
-                              throw new Error('Batch ID not found. Please refresh the page and try again.');
-                            }
-                            
-                            // Create description from batch data
-                            const description = `${batch.honey_type || 'Honey'} - ${batch.producer_name || 'Unknown'} - Qty: ${batch.quantity || 0}kg`;
-                            
-                            const apiUrl = `/batches/${batchPk}/record-on-chain/`;
-                            console.log('Calling API:', apiUrl);
-                            console.log('Request payload:', { description });
-                            
+                            // ...existing code...
                             // Call backend API to record on blockchain
-                            const response = await api.post(apiUrl, {
-                              description,
-                            });
-                            
-                            console.log('API Response:', response.data);
-                            
-                            // Update batch with blockchain tx hash
+                            const batchPk = batch.id;
+                            if (!batchPk) throw new Error('Batch ID not found. Please refresh the page and try again.');
+                            const description = `${batch.honey_type || 'Honey'} - ${batch.producer_name || 'Unknown'} - Qty: ${batch.quantity || 0}kg`;
+                            const apiUrl = `/batches/${batchPk}/record-on-chain/`;
+                            const response = await api.post(apiUrl, { description });
                             if (response.data.blockchain_tx_hash) {
                               setBatch({ ...batch, blockchain_tx_hash: response.data.blockchain_tx_hash });
-                              toast.success(response.data.message || 'Batch recorded on blockchain successfully!');
-                              // Refresh the page data
+                              toast.success(response.data.message || 'Batch recorded on blockchain successfully!', {
+                                description: `Admin Action by: ${user?.email}`
+                              });
                               await fetchBatch(batch.batch_id);
                             } else if (response.data.message) {
                               toast.info(response.data.message);
                             }
                           } catch (err: any) {
-                            // Log full error details for debugging
-                            console.error('Error recording batch:', err);
-                            console.error('Error response:', err?.response);
-                            console.error('Error response data:', err?.response?.data);
-                            console.error('Error status:', err?.response?.status);
-                            console.error('Error message:', err?.message);
-                            
-                            // Handle different error types
+                            // ...existing code...
                             let errorMsg = 'Failed to record batch on blockchain';
                             const errorData = err?.response?.data;
                             const status = err?.response?.status;
-                            
-                            // Network error (backend not reachable)
                             if (!err?.response) {
                               errorMsg = `Cannot connect to backend server. Please ensure the Django backend is running at ${import.meta.env.VITE_DJANGO_API_URL || 'http://localhost:8000'}`;
-                            }
-                            // HTTP error responses
-                            else if (errorData) {
+                            } else if (errorData) {
                               errorMsg = errorData?.message || errorData?.error || errorData?.detail || err?.message || errorMsg;
-                              
-                              // Add details if available
                               if (errorData?.details) {
                                 const details = errorData.details;
                                 const missing = [];
                                 if (!details.has_private_key) missing.push('PRIVATE_KEY');
                                 if (!details.has_public_address) missing.push('PUBLIC_ADDRESS');
                                 if (!details.has_contract_address) missing.push('CONTRACT_ADDRESS');
-                                
                                 if (missing.length > 0) {
                                   errorMsg += `\nMissing environment variables: ${missing.join(', ')}`;
                                 }
-                                
                                 if (details.rpc_url) {
                                   errorMsg += `\nRPC URL: ${details.rpc_url}`;
                                 }
                               }
-                              
-                              // Add status code context
                               if (status === 503) {
                                 errorMsg = `Blockchain service unavailable. ${errorMsg}`;
                               } else if (status === 404) {
@@ -952,14 +1265,10 @@ const HoneyBatch = () => {
                                 errorMsg = `Server error: ${errorMsg}`;
                               }
                             } else {
-                              // Fallback error message
                               errorMsg = err?.message || `HTTP ${status}: ${errorMsg}`;
                             }
-                            
                             setError(errorMsg);
-                            toast.error(errorMsg, {
-                              duration: 10000, // Show longer for detailed errors
-                            });
+                            toast.error(errorMsg, { duration: 10000 });
                           } finally {
                             setRecording(false);
                           }
@@ -983,6 +1292,12 @@ const HoneyBatch = () => {
                         </Alert>
                       )}
                     </div>
+                  )}
+
+                  {batch && !isAdmin && (
+                    <Badge variant="secondary" className="w-full justify-center py-2">
+                      Blockchain Recording Under Review
+                    </Badge>
                   )}
                 </div>
               )}

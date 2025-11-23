@@ -15,6 +15,11 @@ import NotFound from "./pages/NotFound";
 import Batches from "./pages/Batches";
 import VerifyJourney from "./pages/VerifyJourney";
 
+import Administrator from "./pages/Administrator";
+import AdministratorLanding from "./pages/AdministratorLanding";
+import AdministratorBatches from "./pages/AdministratorBatches";
+import AdministratorBatchDetail from "./pages/AdministratorBatchDetail";
+
 
 const queryClient = new QueryClient();
 
@@ -31,7 +36,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/batch/:id" element={<HoneyBatch />} />
               <Route path="/journey" element={<YourJourney />} />
-                <Route path="/verify/:batchId" element={<VerifyJourney />} />
+              <Route path="/verify/:batchId" element={<VerifyJourney />} />
               <Route 
                 path="/account" 
                 element={
@@ -47,6 +52,30 @@ const App = () => (
                     <Batches />
                   </ProtectedRoute>
                 } 
+              />
+              <Route 
+                path="/administrator"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorLanding />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
+                path="/Administratorbatches"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorBatches />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
+                path="/Administratorbatches/:batch_id"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorBatchDetail />
+                  </ProtectedRoute>
+                }
               />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -8,6 +8,8 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
+  is_superuser?: boolean;
+  is_staff?: boolean;
 }
 
 interface AuthContextType {
@@ -67,8 +69,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       setUser(userData);
-      
-      navigate('/');
+      if (userData.is_superuser || userData.is_staff) {
+        navigate('/administrator');
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
     }
@@ -88,8 +93,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       setUser(userData);
-      
-      navigate('/');
+      if (userData.is_superuser || userData.is_staff) {
+        navigate('/administrator');
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed');
     }
@@ -106,8 +114,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       setUser(userData);
-      
-      navigate('/');
+      if (userData.is_superuser || userData.is_staff) {
+        navigate('/administrator');
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Social login failed');
     }

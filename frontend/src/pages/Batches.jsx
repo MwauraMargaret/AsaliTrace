@@ -3,9 +3,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getBatches, createBatch } from "../services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
-const Batches = () => {
+const Batches = ({ adminView = false }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [batches, setBatches] = useState([]);
   const [filteredBatches, setFilteredBatches] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -20,10 +22,15 @@ const Batches = () => {
     blockchain_tx_hash: ""
   });
 
-  // Fetch existing batches on component mount
   useEffect(() => {
     fetchBatches();
   }, []);
+  // Only show user batches if not adminView
+  useEffect(() => {
+    if (!adminView && user) {
+      setFilteredBatches(batches.filter(batch => batch.producer_name === user.email));
+    }
+  }, [batches, adminView, user]);
 
   const fetchBatches = async () => {
     try {
@@ -129,129 +136,77 @@ const Batches = () => {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Batches</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-muted py-12">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">Honey Batches</h1>
+          <p className="text-lg text-muted-foreground">Track, create, and view your honey batches. Blockchain verified for trust and transparency.</p>
+        </div>
 
-      {/* Create Batch Form */}
-      <form onSubmit={handleSubmit} className="mb-6 space-y-2">
-        <input
-          type="text"
-          name="batch_id"
-          placeholder="Batch ID"
-          value={form.batch_id}
-          onChange={handleChange}
-          required
-          className="border p-2 w-full"
-        />
-        <input
-          type="text"
-          name="producer_name"
-          placeholder="Producer Name"
-          value={form.producer_name}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-        <input
-          type="date"
-          name="production_date"
-          placeholder="Production Date"
-          value={form.production_date}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-        <input
-          type="text"
-          name="honey_type"
-          placeholder="Honey Type"
-          value={form.honey_type}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-        <input
-          type="number"
-          name="quantity"
-          placeholder="Quantity"
-          value={form.quantity}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-        <select
-          name="status"
-          value={form.status}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        >
-          <option value="created">Created</option>
-          <option value="tested">Tested</option>
-          <option value="certified">Certified</option>
-          <option value="shipped">Shipped</option>
-        </select>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-blue-500 text-white px-4 py-2 mt-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? "Creating..." : "Create Batch"}
-        </button>
-      </form>
-
-      {/* Status Filter */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-2">Filter by Status:</label>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="all">All Statuses</option>
-          <option value="created">Created</option>
-          <option value="tested">Tested</option>
-          <option value="certified">Certified</option>
-          <option value="shipped">Shipped</option>
-        </select>
-        <span className="ml-2 text-sm text-gray-600">
-          Showing {filteredBatches.length} of {batches.length} batches
-        </span>
-      </div>
-
-      {/* Display Batches */}
-      <div className="space-y-2">
-        {filteredBatches.length === 0 && batches.length === 0 && <p>No batches yet.</p>}
-        {filteredBatches.length === 0 && batches.length > 0 && (
-          <p>No batches found with status "{statusFilter}".</p>
+        {/* Create Batch Form (only for user dashboard, not adminView) */}
+        {!adminView && (
+          <form onSubmit={handleSubmit} className="mb-8 max-w-2xl mx-auto bg-card rounded-xl shadow p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="text" name="batch_id" placeholder="Batch ID" value={form.batch_id} onChange={handleChange} required className="border p-2 rounded w-full" />
+              <input type="text" name="producer_name" placeholder="Producer Name" value={form.producer_name} onChange={handleChange} className="border p-2 rounded w-full" />
+              <input type="date" name="production_date" placeholder="Production Date" value={form.production_date} onChange={handleChange} className="border p-2 rounded w-full" />
+              <input type="text" name="honey_type" placeholder="Honey Type" value={form.honey_type} onChange={handleChange} className="border p-2 rounded w-full" />
+              <input type="number" name="quantity" placeholder="Quantity" value={form.quantity} onChange={handleChange} className="border p-2 rounded w-full" />
+              <select name="status" value={form.status} onChange={handleChange} className="border p-2 rounded w-full">
+                <option value="created">Created</option>
+                <option value="tested">Tested</option>
+                <option value="certified">Certified</option>
+                <option value="shipped">Shipped</option>
+              </select>
+            </div>
+            <button type="submit" disabled={isSubmitting} className="bg-primary text-white px-6 py-2 rounded-lg font-semibold hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed w-full">
+              {isSubmitting ? "Creating..." : "Create Batch"}
+            </button>
+          </form>
         )}
-        {filteredBatches.map((batch) => (
-          <div 
-            key={batch.id} 
-            className="border p-4 rounded-lg hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => navigate(`/batch/${batch.batch_id}`)}
-          >
-            <div className="flex items-center justify-between">
+
+        {/* Status Filter */}
+        <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Filter by Status:</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border p-2 rounded">
+              <option value="all">All Statuses</option>
+              <option value="created">Created</option>
+              <option value="tested">Tested</option>
+              <option value="certified">Certified</option>
+              <option value="shipped">Shipped</option>
+            </select>
+          </div>
+          <span className="text-sm text-muted-foreground">Showing {filteredBatches.length} of {batches.length} batches</span>
+        </div>
+
+        {/* Display Batches */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredBatches.length === 0 && batches.length === 0 && <p className="col-span-full text-center text-muted-foreground">No batches yet.</p>}
+          {filteredBatches.length === 0 && batches.length > 0 && (
+            <p className="col-span-full text-center text-muted-foreground">No batches found with status "{statusFilter}".</p>
+          )}
+          {filteredBatches.map((batch) => (
+            <div key={batch.id} className="bg-card border border-border rounded-xl shadow hover:shadow-lg transition-shadow cursor-pointer p-6 flex flex-col justify-between" onClick={() => navigate(`/batch/${batch.batch_id}`)}>
               <div>
-                <p className="font-bold text-lg">{batch.batch_id}</p>
-                <p><strong>Producer:</strong> {batch.producer_name}</p>
-                <p><strong>Date:</strong> {batch.production_date}</p>
-                <p><strong>Type:</strong> {batch.honey_type}</p>
-                <p><strong>Quantity:</strong> {batch.quantity}</p>
-                <p><strong>Status:</strong> {batch.status}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-lg">{batch.batch_id}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${batch.status === 'certified' ? 'bg-green-100 text-green-700' : batch.status === 'tested' ? 'bg-yellow-100 text-yellow-700' : batch.status === 'shipped' ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>{batch.status}</span>
+                </div>
+                <p className="text-sm"><strong>Producer:</strong> {batch.producer_name}</p>
+                <p className="text-sm"><strong>Date:</strong> {batch.production_date}</p>
+                <p className="text-sm"><strong>Type:</strong> {batch.honey_type}</p>
+                <p className="text-sm"><strong>Quantity:</strong> {batch.quantity}</p>
                 {batch.blockchain_tx_hash && (
-                  <p className="text-xs text-green-600">
-                    <strong>✓ Blockchain Verified:</strong> {batch.blockchain_tx_hash.substring(0, 20)}...
-                  </p>
+                  <span className="inline-block mt-2 px-2 py-1 rounded bg-green-50 text-green-700 text-xs font-semibold">
+                    ✓ Blockchain Verified
+                  </span>
                 )}
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/batch/${batch.batch_id}`);
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-              >
-                View Details
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); navigate(`/batch/${batch.batch_id}`); }} className="mt-4 bg-primary text-white px-4 py-2 rounded hover:bg-secondary w-full">View Details</button>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

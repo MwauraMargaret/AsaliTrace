@@ -92,9 +92,9 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center group hover:scale-105 transition-transform">
+              <Card key={index} className="text-center group hover:scale-105 transition-transform w-full max-w-xs">
                 <CardHeader>
                   <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary/10 to-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     {feature.icon}
@@ -133,7 +133,7 @@ const Index = () => {
                   await navigateToFirstBatch(navigate);
                 }}
               >
-                View Sample Batch
+                Add Your Batch
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>

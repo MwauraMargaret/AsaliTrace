@@ -122,7 +122,7 @@ const YourJourney = () => {
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Every jar of honey has a unique story. Enter your Batch ID to discover 
-              the authentic path from hive to home, verified by blockchain technology.
+              the authentic path from hive to shelf, verified by blockchain technology.
             </p>
           </div>
 
@@ -254,7 +254,7 @@ const YourJourney = () => {
                   <div className="flex items-start gap-3">
                     <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                     <div className="font-medium">Beekeeper Support</div>
-                      <div className="text-sm text-muted-foreground">Directly connects consumers with beekeepers, \
+                      <div className="text-sm text-muted-foreground">Directly connects consumers with beekeepers, 
                         supporting sustainable beekeeping communities.</div>
                   </div>
                   <div className="flex items-start gap-3">
