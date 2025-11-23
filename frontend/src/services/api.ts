@@ -27,11 +27,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    // Only redirect to /auth for endpoints that require authentication
+    const journeyUrlMatch = error?.config?.url?.includes('/batches/journey/');
+    if (error.response?.status === 401 && !journeyUrlMatch) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       window.location.href = '/auth';
     }
+    // For journey endpoint, just reject with error (no redirect)
     return Promise.reject(error);
   }
 );

@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft, Shield, Sparkles, CheckCircle, QrCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import heroImage from "@/assets/hero-honey.jpg";
 //import QRScanner from "@/components/QRScanner";
 
@@ -12,6 +12,23 @@ const YourJourney = () => {
   const [batchId, setBatchId] = useState("");
   const [error, setError] = useState("");
   const [showScanner, setShowScanner] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await import("@/services/api").then(m => m.getStatistics());
+        setStats(data);
+      } catch (err) {
+        setStats({
+          verified_percentage: 0,
+          total_batches: 0,
+          unique_producers: 0,
+        });
+      }
+    };
+    fetchStats();
+  }, []);
 
   const validateBatchId = (id: string): boolean => {
     const pattern = /^B\d+$/;
@@ -180,8 +197,8 @@ const YourJourney = () => {
                     <div className="text-center">
                       <button
                         onClick={() => {
-                          setBatchId("B001");
-                          setTimeout(() => navigate("/verify/B001"), 100);
+                          setBatchId("B002");
+                          setTimeout(() => navigate("/verify/B002"), 100);
                         }}
                         className="text-sm text-primary hover:text-primary/80 underline underline-offset-4 transition-colors"
                       >
@@ -260,17 +277,17 @@ const YourJourney = () => {
             </h3>
             <div className="flex items-center justify-center gap-8 flex-wrap">
               <div>
-                <div className="text-3xl font-bold text-primary">Percent verified</div>
+                <div className="text-3xl font-bold text-primary">{`${stats?.verified_percentage ?? 0}%`}</div>
                 <div className="text-sm text-muted-foreground">Verified Authentic</div>
               </div>
               <div className="h-12 w-px bg-border hidden sm:block" />
               <div>
-                <div className="text-3xl font-bold text-primary">No. of batches</div>
+                <div className="text-3xl font-bold text-primary">{stats?.total_batches ?? 0}</div>
                 <div className="text-sm text-muted-foreground">Traced Batches</div>
               </div>
               <div className="h-12 w-px bg-border hidden sm:block" />
               <div>
-                <div className="text-3xl font-bold text-primary">No. of producers</div>
+                <div className="text-3xl font-bold text-primary">{`${stats?.unique_producers ?? 0}${stats && stats.unique_producers > 0 ? '+' : ''}`}</div>
                 <div className="text-sm text-muted-foreground">Partner Beekeepers</div>
               </div>
             </div>

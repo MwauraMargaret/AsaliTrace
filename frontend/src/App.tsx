@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
 import Batches from "./pages/Batches";
+import VerifyJourney from "./pages/VerifyJourney";
 
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/batch/:id" element={<HoneyBatch />} />
               <Route path="/journey" element={<YourJourney />} />
+                <Route path="/verify/:batchId" element={<VerifyJourney />} />
               <Route 
                 path="/account" 
                 element={
