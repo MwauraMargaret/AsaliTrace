@@ -5,10 +5,12 @@ from django.contrib.auth.password_validation import validate_password
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=False)  # Optional for API compatibility
+    is_superuser = serializers.BooleanField(read_only=True)
+    is_staff = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'password2')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'is_superuser', 'is_staff', 'password', 'password2')
         extra_kwargs = {
             'email': {'required': True},
             'first_name': {'required': True},
@@ -37,6 +39,8 @@ class UserSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', '')
         )
+        user.is_superuser = validated_data.get('is_superuser', False)
+        user.is_staff = validated_data.get('is_staff', False)
         user.set_password(password)
         user.save()
         return user

@@ -1,0 +1,907 @@
+{
+	"info": {
+		"_postman_id": "asalitrace-api-001",
+		"name": "AsaliTrace API",
+		"description": "Complete API collection for AsaliTrace blockchain-based supply chain management system",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access) {",
+									"        pm.environment.set(\"access_token\", jsonData.access);",
+									"    }",
+									"    if (jsonData.refresh) {",
+									"        pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"SecurePassword123!\",\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"username\": \"johndoe\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register", ""]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (!jsonData.requires_2fa && jsonData.access) {",
+									"        pm.environment.set(\"access_token\", jsonData.access);",
+									"    }",
+									"    if (!jsonData.requires_2fa && jsonData.refresh) {",
+									"        pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    }",
+									"    if (jsonData.requires_2fa) {",
+									"        pm.environment.set(\"user_id\", jsonData.user_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"SecurePassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login", ""]
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/token/refresh/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "token", "refresh", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/user/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "user", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2FA",
+			"item": [
+				{
+					"name": "Setup 2FA",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/setup/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "setup", ""]
+						}
+					}
+				},
+				{
+					"name": "Verify 2FA Setup",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/verify-setup/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "verify-setup", ""]
+						}
+					}
+				},
+				{
+					"name": "Verify 2FA Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access) {",
+									"        pm.environment.set(\"access_token\", jsonData.access);",
+									"    }",
+									"    if (jsonData.refresh) {",
+									"        pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": {{user_id}},\n    \"token\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/verify-login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "verify-login", ""]
+						}
+					}
+				},
+				{
+					"name": "Disable 2FA",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/disable/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "disable", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Social Auth",
+			"item": [
+				{
+					"name": "Google OAuth",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access) {",
+									"        pm.environment.set(\"access_token\", jsonData.access);",
+									"    }",
+									"    if (jsonData.refresh) {",
+									"        pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"access_token\": \"ya29.a0AfH6SMBx...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/social/google/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "social", "google", ""]
+						}
+					}
+				},
+				{
+					"name": "GitHub OAuth",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access) {",
+									"        pm.environment.set(\"access_token\", jsonData.access);",
+									"    }",
+									"    if (jsonData.refresh) {",
+									"        pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"access_token\": \"gho_1234567890abcdef...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/social/github/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "social", "github", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Batches",
+			"item": [
+				{
+					"name": "List Batches",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/batches/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Batch",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"batch_id\", jsonData.id);",
+									"    if (jsonData.batch_id) {",
+									"        pm.environment.set(\"batch_batch_id\", jsonData.batch_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch_id\": \"BATCH-2024-001\",\n    \"producer_name\": \"Honey Farm Inc.\",\n    \"production_date\": \"2024-01-15\",\n    \"honey_type\": \"Wildflower\",\n    \"quantity\": \"100.50\",\n    \"status\": \"created\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/batches/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Batch Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/batches/{{batch_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "{{batch_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Batch (PUT)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch_id\": \"BATCH-2024-001\",\n    \"producer_name\": \"Honey Farm Inc. Updated\",\n    \"production_date\": \"2024-01-15\",\n    \"honey_type\": \"Wildflower\",\n    \"quantity\": \"150.75\",\n    \"status\": \"tested\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/batches/{{batch_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "{{batch_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Partial Update Batch (PATCH)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"certified\",\n    \"quantity\": \"150.00\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/batches/{{batch_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "{{batch_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Delete Batch",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/batches/{{batch_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "{{batch_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Batch Statistics",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/batches/statistics/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "statistics", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Batch Audit Trail",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/batches/{{batch_id}}/audit/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "batches", "{{batch_id}}", "audit", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Lab Tests",
+			"item": [
+				{
+					"name": "List Lab Tests",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/labtests/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "labtests", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Lab Test",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch\": {{batch_id}},\n    \"test_type\": \"Purity Test\",\n    \"result\": \"99.5% pure\",\n    \"tested_by\": \"Lab Technician Name\",\n    \"test_date\": \"2024-01-16\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/labtests/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "labtests", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Lab Test Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/labtests/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "labtests", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Lab Test",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch\": {{batch_id}},\n    \"test_type\": \"Purity Test\",\n    \"result\": \"99.8% pure\",\n    \"tested_by\": \"Lab Technician Name\",\n    \"test_date\": \"2024-01-16\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/labtests/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "labtests", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Delete Lab Test",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/labtests/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "labtests", "1", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Certificates",
+			"item": [
+				{
+					"name": "List Certificates",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/certificates/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "certificates", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Certificate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch\": {{batch_id}},\n    \"certificate_id\": \"CERT-2024-001\",\n    \"issued_by\": \"Certification Authority\",\n    \"issue_date\": \"2024-01-17\",\n    \"expiry_date\": \"2025-01-17\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/certificates/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "certificates", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Certificate Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/certificates/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "certificates", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Certificate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"batch\": {{batch_id}},\n    \"certificate_id\": \"CERT-2024-001\",\n    \"issued_by\": \"Certification Authority Updated\",\n    \"issue_date\": \"2024-01-17\",\n    \"expiry_date\": \"2025-01-17\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/certificates/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "certificates", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Delete Certificate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/certificates/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "certificates", "1", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Public",
+			"item": [
+				{
+					"name": "API Root",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/",
+							"host": ["{{base_url}}"],
+							"path": ["api", ""]
+						}
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "batch_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "batch_batch_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+

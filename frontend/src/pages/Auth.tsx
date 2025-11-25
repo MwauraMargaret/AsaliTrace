@@ -123,15 +123,16 @@ const Auth = () => {
 
         // For Google, we'll use a popup-based flow
         // This requires Google OAuth2 library to be loaded
-        if (typeof window.gapi === 'undefined') {
-          throw new Error('Google OAuth library not loaded. Please wait a moment and try again.');
+        // Fix window.gapi type error
+        if (typeof (window as any).gapi === 'undefined') {
+          return;
         }
-
-        window.gapi.load('auth2', () => {
-          window.gapi.auth2.init({
+        (window as any).gapi.load('auth2', () => {
+          (window as any).gapi.auth2.init({
             client_id: GOOGLE_CLIENT_ID,
+            scope: 'profile email',
           }).then(() => {
-            const authInstance = window.gapi.auth2.getAuthInstance();
+            const authInstance = (window as any).gapi.auth2.getAuthInstance();
             authInstance.signIn().then(async (googleUser: any) => {
               const accessToken = googleUser.getAuthResponse().access_token;
               await socialLogin('google', accessToken);
@@ -462,5 +463,11 @@ const Auth = () => {
     </div>
   );
 };
+
+declare global {
+  interface Window {
+    gapi: any;
+  }
+}
 
 export default Auth;

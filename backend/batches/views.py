@@ -1,10 +1,17 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.exceptions import PermissionDenied
 from django.http import Http404
-from .models import Batch, LabTest, Certificate
 from django.db import models
-from .serializers import BatchSerializer, LabTestSerializer, CertificateSerializer
+from django.utils import timezone
+import os
+import logging
+
+from .models import Batch, LabTest, Certificate, AuditLog
+from .serializers import BatchSerializer, LabTestSerializer, CertificateSerializer, AuditLogSerializer
+from .utils import log_audit_action, can_user_access_batch, get_user_batches
 from asalitrace.blockchain.eth_adapter import (
     add_batch_to_chain, 
     get_batch_from_chain, 
@@ -14,11 +21,6 @@ from asalitrace.blockchain.eth_adapter import (
     get_certificate_from_chain,
     test_connection
 )
-import logging
-import os
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
-from rest_framework.exceptions import PermissionDenied
-from .utils import log_audit_action, can_user_access_batch, get_user_batches
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ logger = logging.getLogger(__name__)
 class BatchViewSet(viewsets.ModelViewSet):
     queryset = Batch.objects.all()
     serializer_class = BatchSerializer
-    permission_classes = [IsAuthenticated]  # Require authentication
+    permission_classes = [AllowAny]  
 
     def get_queryset(self):
         """Filter batches based on user permissions."""
@@ -365,9 +367,11 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'message': 'Failed to read batch from blockchain'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(detail=False, methods=['get'], url_path='journey/(?P<batch_id>[^/.]+)')
+    @action(detail=False, methods=['get'], url_path='journey/(?P<batch_id>[^/.]+)', permission_classes=[AllowAny])
     def journey(self, request, batch_id=None):
         """Get complete journey/audit trail for a batch by batch_id."""
+        # Explicitly set permissions for this action
+        self.permission_classes = [AllowAny]
         try:
             # Find batch by batch_id instead of pk
             try:
@@ -377,22 +381,7 @@ class BatchViewSet(viewsets.ModelViewSet):
                     'error': 'Batch not found',
                     'message': f'Batch with ID {batch_id} does not exist.'
                 }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Check permissions
-            user = request.user
-            if not can_user_access_batch(user, batch):
-                if not user.is_authenticated:
-                    return Response({
-                        'error': 'Authentication required',
-                        'message': 'Please login to view the journey for this batch.',
-                        'detail': 'This endpoint requires authentication.'
-                    }, status=status.HTTP_401_UNAUTHORIZED)
-                else:
-                    return Response({
-                        'error': 'Permission denied',
-                        'message': 'You do not have permission to view this batch. Only the batch owner or administrator can access this information.',
-                        'detail': 'Batch ownership mismatch.'
-                    }, status=status.HTTP_403_FORBIDDEN)
+            # Public: anyone can view journey if batch exists
         except Exception as e:
             logger.error(f"Error getting batch for journey: {str(e)}")
             # Re-raise if it's already a Response (from above)
@@ -408,7 +397,6 @@ class BatchViewSet(viewsets.ModelViewSet):
             raise
         
         # Get audit logs for this batch
-        from .models import AuditLog
         audit_logs = AuditLog.objects.filter(batch=batch).order_by('timestamp')
         
         # Build journey steps from audit logs and batch data
@@ -441,6 +429,21 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'blockchain_tx_hash': test.blockchain_tx_hash,
                 'timestamp': (test.test_date or test.created_at).isoformat() if test.test_date or test.created_at else None,
             })
+            
+            # Add flagged lab test as separate step
+            if test.is_flagged:
+                journey_steps.append({
+                    'id': len(journey_steps) + 1,
+                    'title': f'Suspicious Lab Test: {test.test_type}',
+                    'location': 'Admin Review',
+                    'date': test.flag_timestamp.strftime('%b %d, %Y') if test.flag_timestamp else 'Unknown',
+                    'verified': False,
+                    'action': 'flag_lab_test',
+                    'user': test.flagged_by.email if test.flagged_by else 'Admin',
+                    'flag_reason': test.flag_reason,
+                    'timestamp': test.flag_timestamp.isoformat() if test.flag_timestamp else None,
+                    'is_suspicious': True,
+                })
         
         # Step 3: Certificate
         try:
@@ -456,6 +459,35 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'blockchain_tx_hash': cert.blockchain_tx_hash,
                 'timestamp': (cert.issue_date or cert.created_at).isoformat() if cert.issue_date or cert.created_at else None,
             })
+            
+            # Add certificate verification step
+            if cert.is_verified:
+                journey_steps.append({
+                    'id': len(journey_steps) + 1,
+                    'title': 'Certificate Verified',
+                    'location': 'Admin Verification',
+                    'date': cert.verification_timestamp.strftime('%b %d, %Y') if cert.verification_timestamp else 'Unknown',
+                    'verified': True,
+                    'action': 'verify_certificate',
+                    'user': cert.verified_by.email if cert.verified_by else 'Admin',
+                    'timestamp': cert.verification_timestamp.isoformat() if cert.verification_timestamp else None,
+                })
+            
+            # Add flagged certificate as separate step
+            if cert.is_flagged:
+                journey_steps.append({
+                    'id': len(journey_steps) + 1,
+                    'title': 'Suspicious Certificate',
+                    'location': 'Admin Review',
+                    'date': cert.flag_timestamp.strftime('%b %d, %Y') if cert.flag_timestamp else 'Unknown',
+                    'verified': False,
+                    'action': 'flag_certificate',
+                    'user': cert.flagged_by.email if cert.flagged_by else 'Admin',
+                    'flag_reason': cert.flag_reason,
+                    'timestamp': cert.flag_timestamp.isoformat() if cert.flag_timestamp else None,
+                    'is_suspicious': True,
+                })
+                
         except Certificate.DoesNotExist:
             pass
         
@@ -473,6 +505,13 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'blockchain_tx_hash': batch.blockchain_tx_hash,
                 'timestamp': (blockchain_log.timestamp if blockchain_log else batch.updated_at).isoformat(),
             })
+        
+        # Sort steps by timestamp
+        journey_steps.sort(key=lambda x: x.get('timestamp', ''))
+        
+        # Reassign IDs after sorting
+        for idx, step in enumerate(journey_steps, 1):
+            step['id'] = idx
         
         # Get full audit trail
         audit_trail = []
@@ -492,10 +531,14 @@ class BatchViewSet(viewsets.ModelViewSet):
         
         return Response({
             'batch_id': batch.batch_id,
+            'batch_status': batch.status,
+            'verification_status': batch.verification_status,
+            'has_suspicious_activity': batch.has_suspicious_activity,
             'journey_steps': journey_steps,
             'audit_trail': audit_trail,
             'total_steps': len(journey_steps),
             'verified_steps': sum(1 for step in journey_steps if step.get('verified', False)),
+            'suspicious_steps': sum(1 for step in journey_steps if step.get('is_suspicious', False)),
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='statistics', permission_classes=[AllowAny])
@@ -520,11 +563,26 @@ class BatchViewSet(viewsets.ModelViewSet):
             # Verified lab tests
             verified_lab_tests = LabTest.objects.filter(blockchain_tx_hash__isnull=False).count()
             
+            # Flagged lab tests
+            flagged_lab_tests = LabTest.objects.filter(is_flagged=True).count()
+            
             # Total certificates
             total_certificates = Certificate.objects.count()
             
             # Verified certificates
             verified_certificates = Certificate.objects.filter(blockchain_tx_hash__isnull=False).count()
+            
+            # Admin verified certificates
+            admin_verified_certificates = Certificate.objects.filter(is_verified=True).count()
+            
+            # Flagged certificates
+            flagged_certificates = Certificate.objects.filter(is_flagged=True).count()
+            
+            # Batches with suspicious activity
+            batches_with_suspicious_activity = Batch.objects.filter(
+                models.Q(lab_tests__is_flagged=True) | 
+                models.Q(certificate__is_flagged=True)
+            ).distinct().count()
             
             return Response({
                 'total_batches': total_batches,
@@ -533,8 +591,12 @@ class BatchViewSet(viewsets.ModelViewSet):
                 'unique_producers': unique_producers,
                 'total_lab_tests': total_lab_tests,
                 'verified_lab_tests': verified_lab_tests,
+                'flagged_lab_tests': flagged_lab_tests,
                 'total_certificates': total_certificates,
                 'verified_certificates': verified_certificates,
+                'admin_verified_certificates': admin_verified_certificates,
+                'flagged_certificates': flagged_certificates,
+                'batches_with_suspicious_activity': batches_with_suspicious_activity,
             }, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"Error calculating statistics: {str(e)}")
@@ -698,6 +760,84 @@ class LabTestViewSet(viewsets.ModelViewSet):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def flag(self, request, pk=None):
+        """Admin action to flag a lab test as suspicious."""
+        lab_test = self.get_object()
+        reason = request.data.get('reason', '')
+        flagged_by = request.user.email if request.user.is_authenticated else 'Admin'
+        
+        if not reason:
+            return Response({
+                'error': 'Reason is required for flagging'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update lab test with flag information
+        lab_test.is_flagged = True
+        lab_test.flagged_by = request.user
+        lab_test.flag_reason = reason
+        lab_test.flag_timestamp = timezone.now()
+        lab_test.save()
+        
+        # Log audit trail
+        log_audit_action(
+            action='flag_lab_test',
+            user=request.user,
+            lab_test=lab_test,
+            batch=lab_test.batch,
+            action_description=f"Flagged lab test {lab_test.test_type} as suspicious",
+            new_values={
+                'is_flagged': True,
+                'flag_reason': reason,
+                'flagged_by': flagged_by,
+            },
+            request=request
+        )
+        
+        serializer = self.get_serializer(lab_test)
+        return Response({
+            'message': 'Lab test flagged successfully',
+            'lab_test': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def unflag(self, request, pk=None):
+        """Admin action to remove flag from a lab test."""
+        lab_test = self.get_object()
+        
+        if not lab_test.is_flagged:
+            return Response({
+                'message': 'Lab test is not flagged'
+            }, status=status.HTTP_200_OK)
+        
+        # Remove flag
+        lab_test.is_flagged = False
+        lab_test.flagged_by = None
+        lab_test.flag_reason = ""
+        lab_test.flag_timestamp = None
+        lab_test.save()
+        
+        # Log audit trail
+        log_audit_action(
+            action='unflag_lab_test',
+            user=request.user,
+            lab_test=lab_test,
+            batch=lab_test.batch,
+            action_description=f"Removed flag from lab test {lab_test.test_type}",
+            old_values={
+                'is_flagged': True,
+                'flag_reason': lab_test.flag_reason,
+                'flagged_by': lab_test.flagged_by.email if lab_test.flagged_by else None,
+            },
+            request=request
+        )
+        
+        serializer = self.get_serializer(lab_test)
+        return Response({
+            'message': 'Lab test unflagged successfully',
+            'lab_test': serializer.data
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='verify-test/(?P<test_id>[^/.]+)')
     def verify_test_from_blockchain(self, request, test_id=None):
         """Read lab test data from blockchain via backend (no wallet needed)."""
@@ -748,7 +888,7 @@ class LabTestViewSet(viewsets.ModelViewSet):
 class CertificateViewSet(viewsets.ModelViewSet):
     queryset = Certificate.objects.all()
     serializer_class = CertificateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter certificates based on user permissions."""
@@ -926,6 +1066,116 @@ class CertificateViewSet(viewsets.ModelViewSet):
                     'has_contract_address': bool(os.getenv("CONTRACT_ADDRESS")),
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def verify(self, request, pk=None):
+        """Admin action to verify a certificate."""
+        certificate = self.get_object()
+        verified_by = request.user.email if request.user.is_authenticated else 'Admin'
+        
+        # Update certificate with verification information
+        certificate.is_verified = True
+        certificate.verified_by = request.user
+        certificate.verification_timestamp = timezone.now()
+        certificate.save()
+        
+        # Log audit trail
+        log_audit_action(
+            action='verify_certificate',
+            user=request.user,
+            certificate=certificate,
+            batch=certificate.batch,
+            action_description=f"Verified certificate {certificate.certificate_id}",
+            new_values={
+                'is_verified': True,
+                'verified_by': verified_by,
+            },
+            request=request
+        )
+        
+        serializer = self.get_serializer(certificate)
+        return Response({
+            'message': 'Certificate verified successfully',
+            'certificate': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def flag(self, request, pk=None):
+        """Admin action to flag a certificate as suspicious."""
+        certificate = self.get_object()
+        reason = request.data.get('reason', '')
+        flagged_by = request.user.email if request.user.is_authenticated else 'Admin'
+        
+        if not reason:
+            return Response({
+                'error': 'Reason is required for flagging'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update certificate with flag information
+        certificate.is_flagged = True
+        certificate.flagged_by = request.user
+        certificate.flag_reason = reason
+        certificate.flag_timestamp = timezone.now()
+        certificate.save()
+        
+        # Log audit trail
+        log_audit_action(
+            action='flag_certificate',
+            user=request.user,
+            certificate=certificate,
+            batch=certificate.batch,
+            action_description=f"Flagged certificate {certificate.certificate_id} as suspicious",
+            new_values={
+                'is_flagged': True,
+                'flag_reason': reason,
+                'flagged_by': flagged_by,
+            },
+            request=request
+        )
+        
+        serializer = self.get_serializer(certificate)
+        return Response({
+            'message': 'Certificate flagged successfully',
+            'certificate': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def unflag(self, request, pk=None):
+        """Admin action to remove flag from a certificate."""
+        certificate = self.get_object()
+        
+        if not certificate.is_flagged:
+            return Response({
+                'message': 'Certificate is not flagged'
+            }, status=status.HTTP_200_OK)
+        
+        # Remove flag
+        certificate.is_flagged = False
+        certificate.flagged_by = None
+        certificate.flag_reason = ""
+        certificate.flag_timestamp = None
+        certificate.save()
+        
+        # Log audit trail
+        log_audit_action(
+            action='unflag_certificate',
+            user=request.user,
+            certificate=certificate,
+            batch=certificate.batch,
+            action_description=f"Removed flag from certificate {certificate.certificate_id}",
+            old_values={
+                'is_flagged': True,
+                'flag_reason': certificate.flag_reason,
+                'flagged_by': certificate.flagged_by.email if certificate.flagged_by else None,
+            },
+            request=request
+        )
+        
+        serializer = self.get_serializer(certificate)
+        return Response({
+            'message': 'Certificate unflagged successfully',
+            'certificate': serializer.data
+        }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='verify-certificate/(?P<cert_id>[^/.]+)')
     def verify_certificate_from_blockchain(self, request, cert_id=None):
