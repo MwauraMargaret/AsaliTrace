@@ -1,0 +1,89 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Web3Provider } from "@/contexts/Web3Context";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import Index from "./pages/Index";
+import HoneyBatch from "./pages/HoneyBatch";
+import YourJourney from "./pages/YourJourney";
+import Auth from "./pages/Auth";
+import Account from "./pages/Account";
+import NotFound from "./pages/NotFound";
+import Batches from "./pages/Batches";
+import VerifyJourney from "./pages/VerifyJourney";
+
+import Administrator from "./pages/Administrator";
+import AdministratorLanding from "./pages/AdministratorLanding";
+import AdministratorBatches from "./pages/AdministratorBatches";
+import AdministratorBatchDetail from "./pages/AdministratorBatchDetail";
+
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
+          <Web3Provider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/batch/:id" element={<HoneyBatch />} />
+              <Route path="/journey" element={<YourJourney />} />
+              <Route path="/verify/:batchId" element={<VerifyJourney />} />
+              <Route 
+                path="/account" 
+                element={
+                  <ProtectedRoute>
+                    <Account />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/batches" 
+                element={
+                  <ProtectedRoute>
+                    <Batches />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/administrator"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorLanding />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
+                path="/Administratorbatches"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorBatches />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
+                path="/Administratorbatches/:batch_id"
+                element={
+                  <ProtectedRoute>
+                    <AdministratorBatchDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Web3Provider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
